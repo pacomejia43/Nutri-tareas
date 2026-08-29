@@ -1,0 +1,84 @@
+name: Android Release
+
+# Triggered by pushing a tag like v1.0.1 (see README.md "Publicar una actualización").
+# Builds a signed release APK whose versionCode/versionName come from the tag, and
+# publishes it as a GitHub Release - the in-app updater (data/update) polls
+# /releases/latest on this repo and offers that APK asset as the download.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Bootstrap Gradle wrapper jar
+        # Not committed as a binary (see .gitignore); regenerated from the same distribution
+        # gradle-wrapper.properties already pins, so it's always the exact intended version.
+        run: |
+          curl -sSL -o /tmp/gradle-bootstrap.zip https://services.gradle.org/distributions/gradle-8.14.3-bin.zip
+          unzip -q /tmp/gradle-bootstrap.zip -d /tmp
+          /tmp/gradle-8.14.3/bin/gradle wrapper --gradle-version 8.14.3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Derive version from tag
+        id: version
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VERSION_NAME="${TAG#v}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION_NAME"
+          VERSION_CODE=$((MAJOR * 10000 + MINOR * 100 + PATCH))
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "versionName=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "versionCode=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Unit tests
+        run: ./gradlew testReleaseUnitTest --stacktrace
+
+      - name: Build signed release APK
+        env:
+          RELEASE_KEYSTORE_PATH: ${{ secrets.RELEASE_KEYSTORE_PATH }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleRelease \
+            -PversionNameOverride="${{ steps.version.outputs.versionName }}" \
+            -PversionCodeOverride="${{ steps.version.outputs.versionCode }}" \
+            --stacktrace
+
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/release/*.apk "out/Nutri-Tareas-${{ steps.version.outputs.versionName }}.apk"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "Nutri-Tareas ${{ steps.version.outputs.versionName }}"
+          files: out/*.apk
+          generate_release_notes: true

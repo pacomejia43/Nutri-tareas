@@ -1,0 +1,21 @@
+*.iml
+.gradle/
+.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+/app/build
+/app/release
+*.hprof
+.kotlin/
+
+# Not committed as a binary - see README.md "Compilar en Android Studio" for how it's
+# bootstrapped (Android Studio does this on its own; command-line users run `gradle wrapper`).
+/gradle/wrapper/gradle-wrapper.jar
+
+# Committed as *.base64 (text-safe) and decoded at Gradle configuration time - see
+# release-signing/README.md. Regenerate manually with: base64 -d <file>.base64 > <file>
+/release-signing/nutri-tareas-release.keystore
