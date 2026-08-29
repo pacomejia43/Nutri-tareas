@@ -7,6 +7,10 @@
     <string name="input_placeholder">Escribe tu mensaje…</string>
     <string name="template_document_label">Plantilla</string>
     <string name="cd_open_template_document">Abrir la plantilla en Google Docs</string>
+    <string name="template_menu_view">Ver documento</string>
+    <string name="template_menu_sync">Aplicar cambios del chat</string>
+    <string name="google_doc_sync_intro">Este es el contenido actual de la plantilla de Google Docs, párrafo por párrafo:\n\n%1$s</string>
+    <string name="google_doc_synced">Cambios aplicados a la plantilla de Google Docs.</string>
     <string name="document_ready">Documento generado</string>
     <string name="save_document">Guardar</string>
     <string name="share_document">Compartir</string>
@@ -33,6 +37,8 @@
     <string name="error_image_read">No se pudo leer esa imagen. Intenta con otra.</string>
     <string name="error_template_read">No se pudo leer esa plantilla. Verifica que sea un archivo .docx válido.</string>
     <string name="error_template_apply">No identifiqué cambios para aplicar a la plantilla. Pídele a Paco que los aplique de nuevo.</string>
+    <string name="error_no_template_web_app_url">Primero configura la URL de la plantilla de Google Docs en Ajustes.</string>
+    <string name="error_template_sync">No se pudo sincronizar con la plantilla de Google Docs. Revisa tu conexión o la URL en Ajustes.</string>
     <string name="error_network">No hay conexión a internet. Revisa tu conexión e inténtalo de nuevo.</string>
     <string name="error_invalid_api_key">Tu clave de API no es válida o fue revocada. Revísala en Ajustes.</string>
     <string name="error_rate_limited">Se alcanzó el límite de uso de la API. Espera un momento e inténtalo de nuevo.</string>
@@ -58,6 +64,12 @@
     <string name="model_gemini_flash_lite">Gemini Flash-Lite (más económico)</string>
     <string name="model_custom">Personalizado</string>
     <string name="model_custom_label">ID del modelo</string>
+    <string name="template_web_app_section_title">Plantilla de Google Docs</string>
+    <string name="template_web_app_section_hint">Pega aquí la URL de la \"aplicación web\" que publicaste desde el Apps Script del documento, para que Paco pueda leerlo y editarlo directamente.</string>
+    <string name="template_web_app_placeholder">https://script.google.com/macros/s/…/exec</string>
+    <string name="template_web_app_hint">Se guarda cifrada en este dispositivo, igual que las claves de Claude y Gemini.</string>
+    <string name="template_web_app_url_saved">URL guardada</string>
+    <string name="template_web_app_url_clear">Quitar URL</string>
     <string name="save">Guardar</string>
     <string name="cancel">Cancelar</string>
     <string name="go_to_settings">Ir a Ajustes</string>

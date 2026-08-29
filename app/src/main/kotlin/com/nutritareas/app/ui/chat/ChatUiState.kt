@@ -17,6 +17,7 @@ data class ChatUiState(
     val templateParagraphCount: Int = 0,
     val isLoadingTemplate: Boolean = false,
     val isBuildingDocument: Boolean = false,
+    val isSyncingTemplateDoc: Boolean = false,
     val readyDocumentUri: Uri? = null,
     val readyDocumentFileName: String? = null,
     val errorMessage: String? = null,

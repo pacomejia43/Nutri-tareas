@@ -42,6 +42,10 @@ data class SettingsUiState(
     val selectedGeminiModelOption: GeminiModelOption = GeminiModelOption.fromModelId(AppSettings.DEFAULT_GEMINI_MODEL_ID),
     val customGeminiModelId: String = "",
 
+    val isEditingTemplateWebAppUrl: Boolean = true,
+    val templateWebAppUrlInput: String = "",
+    val hasStoredTemplateWebAppUrl: Boolean = false,
+
     val currentVersionName: String = "",
     val infoMessage: String? = null,
     val errorMessage: String? = null,

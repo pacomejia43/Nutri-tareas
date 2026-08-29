@@ -7,9 +7,11 @@ data class AppSettings(
     val geminiApiKey: String? = null,
     val geminiModelId: String = DEFAULT_GEMINI_MODEL_ID,
     val lastSeenReleaseTag: String? = null,
+    val templateWebAppUrl: String? = null,
 ) {
     val hasClaudeApiKey: Boolean get() = !claudeApiKey.isNullOrBlank()
     val hasGeminiApiKey: Boolean get() = !geminiApiKey.isNullOrBlank()
+    val hasTemplateWebAppUrl: Boolean get() = !templateWebAppUrl.isNullOrBlank()
 
     /** API key for whichever provider is active right now - what the assistant client actually uses. */
     val activeApiKey: String?

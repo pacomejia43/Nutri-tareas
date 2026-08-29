@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nutritareas.app.R
@@ -204,6 +205,32 @@ fun SettingsScreen(onBack: () -> Unit) {
             HorizontalDivider()
             Spacer(Modifier.height(24.dp))
 
+            SectionTitle(stringResource(R.string.template_web_app_section_title))
+            Text(
+                stringResource(R.string.template_web_app_section_hint),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+            ApiKeySection(
+                isEditing = uiState.isEditingTemplateWebAppUrl,
+                keyInput = uiState.templateWebAppUrlInput,
+                onKeyInputChange = viewModel::onTemplateWebAppUrlInputChange,
+                hasStoredKey = uiState.hasStoredTemplateWebAppUrl,
+                onSave = viewModel::onSaveTemplateWebAppUrl,
+                onCancel = viewModel::onCancelEditingTemplateWebAppUrl,
+                onStartEditing = viewModel::onStartEditingTemplateWebAppUrl,
+                onClear = viewModel::onClearTemplateWebAppUrl,
+                placeholder = stringResource(R.string.template_web_app_placeholder),
+                hint = stringResource(R.string.template_web_app_hint),
+                isSecret = false,
+                savedLabel = stringResource(R.string.template_web_app_url_saved),
+                clearLabel = stringResource(R.string.template_web_app_url_clear),
+            )
+
+            Spacer(Modifier.height(24.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(24.dp))
+
             SectionTitle(stringResource(R.string.about_title))
             Text(stringResource(R.string.current_version, uiState.currentVersionName), modifier = Modifier.padding(top = 4.dp))
             Spacer(Modifier.height(8.dp))
@@ -275,6 +302,9 @@ private fun ApiKeySection(
     onClear: () -> Unit,
     placeholder: String,
     hint: String,
+    isSecret: Boolean = true,
+    savedLabel: String = stringResource(R.string.api_key_saved),
+    clearLabel: String = stringResource(R.string.api_key_clear),
 ) {
     if (isEditing) {
         Column {
@@ -283,8 +313,10 @@ private fun ApiKeySection(
                 onValueChange = onKeyInputChange,
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 placeholder = { Text(placeholder) },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                visualTransformation = if (isSecret) PasswordVisualTransformation() else VisualTransformation.None,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = if (isSecret) KeyboardType.Password else KeyboardType.Uri,
+                ),
                 singleLine = true,
             )
             Text(
@@ -307,9 +339,9 @@ private fun ApiKeySection(
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(stringResource(R.string.api_key_saved), modifier = Modifier.weight(1f))
+            Text(savedLabel, modifier = Modifier.weight(1f))
             TextButton(onClick = onStartEditing) { Text(stringResource(R.string.save)) }
-            TextButton(onClick = onClear) { Text(stringResource(R.string.api_key_clear)) }
+            TextButton(onClick = onClear) { Text(clearLabel) }
         }
     }
 }

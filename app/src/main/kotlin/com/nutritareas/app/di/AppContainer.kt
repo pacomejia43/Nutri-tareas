@@ -11,6 +11,7 @@ import com.nutritareas.app.data.image.ImageProcessor
 import com.nutritareas.app.data.pdf.PdfTextExtractor
 import com.nutritareas.app.data.settings.AssistantProvider
 import com.nutritareas.app.data.settings.SettingsRepository
+import com.nutritareas.app.data.template.TemplateDocSyncClient
 import com.nutritareas.app.data.update.UpdateChecker
 import com.nutritareas.app.data.update.UpdateInstaller
 
@@ -23,6 +24,7 @@ class AppContainer(context: Context) {
     val pdfTextExtractor: PdfTextExtractor by lazy { PdfTextExtractor(appContext) }
     val imageProcessor: ImageProcessor by lazy { ImageProcessor(appContext) }
     val docxTemplateReader: DocxTemplateReader by lazy { DocxTemplateReader(appContext) }
+    val templateDocSyncClient: TemplateDocSyncClient by lazy { TemplateDocSyncClient() }
     val claudeAssistantClient: ClaudeAssistantClient by lazy { ClaudeAssistantClient() }
     val geminiAssistantClient: GeminiAssistantClient by lazy { GeminiAssistantClient() }
     val updateChecker: UpdateChecker by lazy {

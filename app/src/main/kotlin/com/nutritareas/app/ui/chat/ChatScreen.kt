@@ -22,8 +22,13 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,7 +44,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -144,7 +151,11 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                     IconButton(onClick = viewModel::onNewConversationClick) {
                         Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.new_conversation))
                     }
-                    TemplateDocumentButton(onClick = { openTemplateDocument(context) })
+                    TemplateDocumentButton(
+                        isSyncing = uiState.isSyncingTemplateDoc,
+                        onOpenDocument = { openTemplateDocument(context) },
+                        onSyncFromChat = viewModel::onSyncTemplateDocClick,
+                    )
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.cd_settings))
                     }
@@ -250,19 +261,44 @@ private fun openTemplateDocument(context: Context) {
 }
 
 @Composable
-private fun TemplateDocumentButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .clip(MaterialTheme.shapes.small)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Icon(
-            Icons.Filled.Description,
-            contentDescription = stringResource(R.string.cd_open_template_document),
-            modifier = Modifier.size(22.dp),
-        )
-        Text(stringResource(R.string.template_document_label), style = MaterialTheme.typography.labelSmall)
+private fun TemplateDocumentButton(
+    isSyncing: Boolean,
+    onOpenDocument: () -> Unit,
+    onSyncFromChat: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier = modifier) {
+        Column(
+            modifier = Modifier
+                .clip(MaterialTheme.shapes.small)
+                .clickable(enabled = !isSyncing) { expanded = true }
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (isSyncing) {
+                CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+            } else {
+                Icon(
+                    Icons.Filled.Description,
+                    contentDescription = stringResource(R.string.cd_open_template_document),
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Text(stringResource(R.string.template_document_label), style = MaterialTheme.typography.labelSmall)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.template_menu_view)) },
+                leadingIcon = { Icon(Icons.Filled.OpenInNew, contentDescription = null) },
+                onClick = { expanded = false; onOpenDocument() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.template_menu_sync)) },
+                leadingIcon = { Icon(Icons.Filled.Sync, contentDescription = null) },
+                onClick = { expanded = false; onSyncFromChat() },
+            )
+        }
     }
 }

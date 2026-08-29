@@ -32,6 +32,8 @@ import com.nutritareas.app.data.pdf.PdfTextExtractor
 import com.nutritareas.app.data.settings.AppSettings
 import com.nutritareas.app.data.settings.AssistantProvider
 import com.nutritareas.app.data.settings.SettingsRepository
+import com.nutritareas.app.data.template.TemplateDocSyncClient
+import com.nutritareas.app.data.template.TemplateSyncException
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +51,7 @@ class ChatViewModel(
     private val pdfTextExtractor: PdfTextExtractor,
     private val imageProcessor: ImageProcessor,
     private val docxTemplateReader: DocxTemplateReader,
+    private val templateDocSyncClient: TemplateDocSyncClient,
     private val claudeAssistantClient: AssistantClient,
     private val geminiAssistantClient: AssistantClient,
 ) : AndroidViewModel(application) {
@@ -186,6 +189,35 @@ class ChatViewModel(
         sendTurn(AssistantPersona.APPLY_TEMPLATE_REQUEST, isTemplateApplication = true)
     }
 
+    /** Reads the live Google Doc, feeds it into the chat, and asks the assistant for the edits to apply back to it. */
+    fun onSyncTemplateDocClick() {
+        if (_uiState.value.isSyncingTemplateDoc || _uiState.value.isAssistantResponding) return
+        val app = getApplication<Application>()
+        val webAppUrl = currentSettings.templateWebAppUrl
+        if (webAppUrl.isNullOrBlank()) {
+            _uiState.update { it.copy(errorMessage = app.getString(R.string.error_no_template_web_app_url)) }
+            return
+        }
+        if (currentSettings.activeApiKey.isNullOrBlank()) {
+            _uiState.update { it.copy(errorMessage = app.getString(R.string.error_no_api_key)) }
+            return
+        }
+        _uiState.update { it.copy(isSyncingTemplateDoc = true, errorMessage = null) }
+        viewModelScope.launch {
+            try {
+                val paragraphs = templateDocSyncClient.fetchParagraphs(webAppUrl)
+                val listing = paragraphs.mapIndexed { index, text ->
+                    "[$index] " + text.ifBlank { app.getString(R.string.template_paragraph_empty) }
+                }.joinToString("\n")
+                val introText = app.getString(R.string.google_doc_sync_intro, listing) +
+                    "\n\n" + AssistantPersona.APPLY_TEMPLATE_REQUEST
+                sendTurn(introText, isGoogleDocSync = true)
+            } catch (e: TemplateSyncException) {
+                _uiState.update { it.copy(isSyncingTemplateDoc = false, errorMessage = app.getString(R.string.error_template_sync)) }
+            }
+        }
+    }
+
     fun onNewConversationClick() {
         _uiState.update { it.copy(showNewConversationConfirm = true) }
     }
@@ -237,6 +269,7 @@ class ChatViewModel(
         userText: String,
         images: List<ChatImageAttachment> = emptyList(),
         isTemplateApplication: Boolean = false,
+        isGoogleDocSync: Boolean = false,
     ) {
         val app = getApplication<Application>()
         val apiKey = currentSettings.activeApiKey
@@ -279,10 +312,12 @@ class ChatViewModel(
                     is AssistantStreamEvent.Completed -> {
                         appendAssistantMessage(event.fullText, isError = false)
                         if (isTemplateApplication) applyTemplateEdits(event.fullText)
+                        if (isGoogleDocSync) applyGoogleDocEdits(event.fullText)
                     }
 
                     is AssistantStreamEvent.Failed -> {
                         appendAssistantMessage(errorText(event.error), isError = true)
+                        if (isGoogleDocSync) _uiState.update { it.copy(isSyncingTemplateDoc = false) }
                     }
                 }
             }
@@ -337,6 +372,30 @@ class ChatViewModel(
         }
     }
 
+    private fun applyGoogleDocEdits(assistantText: String) {
+        val app = getApplication<Application>()
+        val webAppUrl = currentSettings.templateWebAppUrl
+        val edits = parseTemplateEdits(assistantText)
+        if (webAppUrl.isNullOrBlank()) {
+            _uiState.update { it.copy(isSyncingTemplateDoc = false, errorMessage = app.getString(R.string.error_no_template_web_app_url)) }
+            return
+        }
+        if (edits.isEmpty()) {
+            _uiState.update { it.copy(isSyncingTemplateDoc = false, errorMessage = app.getString(R.string.error_template_apply)) }
+            return
+        }
+        viewModelScope.launch {
+            try {
+                templateDocSyncClient.applyEdits(webAppUrl, edits)
+                _uiState.update {
+                    it.copy(isSyncingTemplateDoc = false, infoMessage = app.getString(R.string.google_doc_synced))
+                }
+            } catch (e: TemplateSyncException) {
+                _uiState.update { it.copy(isSyncingTemplateDoc = false, errorMessage = app.getString(R.string.error_template_sync)) }
+            }
+        }
+    }
+
     private fun errorText(error: AssistantError): String {
         val app = getApplication<Application>()
         return when (error) {
@@ -368,6 +427,7 @@ class ChatViewModel(
                         pdfTextExtractor = container.pdfTextExtractor,
                         imageProcessor = container.imageProcessor,
                         docxTemplateReader = container.docxTemplateReader,
+                        templateDocSyncClient = container.templateDocSyncClient,
                         claudeAssistantClient = container.claudeAssistantClient,
                         geminiAssistantClient = container.geminiAssistantClient,
                     )

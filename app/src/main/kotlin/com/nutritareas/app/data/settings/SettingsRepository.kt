@@ -27,6 +27,7 @@ class SettingsRepository(
             geminiApiKey = prefs[Keys.ENCRYPTED_GEMINI_API_KEY]?.let { cryptoManager.decrypt(it) },
             geminiModelId = prefs[Keys.GEMINI_MODEL_ID] ?: AppSettings.DEFAULT_GEMINI_MODEL_ID,
             lastSeenReleaseTag = prefs[Keys.LAST_SEEN_RELEASE_TAG],
+            templateWebAppUrl = prefs[Keys.ENCRYPTED_TEMPLATE_WEB_APP_URL]?.let { cryptoManager.decrypt(it) },
         )
     }
 
@@ -64,6 +65,14 @@ class SettingsRepository(
         context.settingsDataStore.edit { prefs -> prefs[Keys.LAST_SEEN_RELEASE_TAG] = tag }
     }
 
+    suspend fun saveTemplateWebAppUrl(url: String) {
+        context.settingsDataStore.edit { prefs -> prefs[Keys.ENCRYPTED_TEMPLATE_WEB_APP_URL] = cryptoManager.encrypt(url) }
+    }
+
+    suspend fun clearTemplateWebAppUrl() {
+        context.settingsDataStore.edit { prefs -> prefs.remove(Keys.ENCRYPTED_TEMPLATE_WEB_APP_URL) }
+    }
+
     private object Keys {
         val ACTIVE_PROVIDER = stringPreferencesKey("active_provider")
         val ENCRYPTED_CLAUDE_API_KEY = stringPreferencesKey("encrypted_claude_api_key")
@@ -71,5 +80,6 @@ class SettingsRepository(
         val ENCRYPTED_GEMINI_API_KEY = stringPreferencesKey("encrypted_gemini_api_key")
         val GEMINI_MODEL_ID = stringPreferencesKey("gemini_model_id")
         val LAST_SEEN_RELEASE_TAG = stringPreferencesKey("last_seen_release_tag")
+        val ENCRYPTED_TEMPLATE_WEB_APP_URL = stringPreferencesKey("encrypted_template_web_app_url")
     }
 }

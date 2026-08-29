@@ -50,6 +50,8 @@ class SettingsViewModel(
                         } else {
                             it.customGeminiModelId
                         },
+                        hasStoredTemplateWebAppUrl = settings.hasTemplateWebAppUrl,
+                        isEditingTemplateWebAppUrl = it.isEditingTemplateWebAppUrl && !settings.hasTemplateWebAppUrl,
                     )
                 }
             }
@@ -148,6 +150,43 @@ class SettingsViewModel(
     fun onCustomGeminiModelIdChange(value: String) {
         _uiState.update { it.copy(customGeminiModelId = value) }
         if (value.isNotBlank()) viewModelScope.launch { settingsRepository.saveGeminiModelId(value.trim()) }
+    }
+
+    // --- Template Google Doc (Apps Script Web App URL) ---
+
+    fun onTemplateWebAppUrlInputChange(value: String) {
+        _uiState.update { it.copy(templateWebAppUrlInput = value) }
+    }
+
+    fun onStartEditingTemplateWebAppUrl() {
+        _uiState.update { it.copy(isEditingTemplateWebAppUrl = true, templateWebAppUrlInput = "") }
+    }
+
+    fun onCancelEditingTemplateWebAppUrl() {
+        _uiState.update { it.copy(isEditingTemplateWebAppUrl = !it.hasStoredTemplateWebAppUrl, templateWebAppUrlInput = "") }
+    }
+
+    fun onSaveTemplateWebAppUrl() {
+        val app = getApplication<Application>()
+        val url = _uiState.value.templateWebAppUrlInput.trim()
+        if (url.isEmpty()) return
+        viewModelScope.launch {
+            settingsRepository.saveTemplateWebAppUrl(url)
+            _uiState.update {
+                it.copy(
+                    isEditingTemplateWebAppUrl = false,
+                    templateWebAppUrlInput = "",
+                    infoMessage = app.getString(R.string.template_web_app_url_saved),
+                )
+            }
+        }
+    }
+
+    fun onClearTemplateWebAppUrl() {
+        viewModelScope.launch {
+            settingsRepository.clearTemplateWebAppUrl()
+            _uiState.update { it.copy(isEditingTemplateWebAppUrl = true, templateWebAppUrlInput = "") }
+        }
     }
 
     fun onInfoMessageShown() {
