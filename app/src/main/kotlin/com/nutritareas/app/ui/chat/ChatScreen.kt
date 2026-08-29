@@ -46,11 +46,13 @@ import com.nutritareas.app.data.chat.ChatMessage
 import com.nutritareas.app.data.chat.ChatRole
 import com.nutritareas.app.data.settings.AssistantProvider
 import com.nutritareas.app.ui.chat.components.ApiKeyMissingBanner
+import com.nutritareas.app.ui.chat.components.ApplyTemplateRow
 import com.nutritareas.app.ui.chat.components.ChatInputBar
 import com.nutritareas.app.ui.chat.components.DocumentReadyRow
 import com.nutritareas.app.ui.chat.components.GenerateDocumentRow
 import com.nutritareas.app.ui.chat.components.MessageBubble
 import com.nutritareas.app.ui.chat.components.PdfChip
+import com.nutritareas.app.ui.chat.components.TemplateChip
 import com.nutritareas.app.ui.chat.components.TypingIndicatorBubble
 
 private const val DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -73,6 +75,9 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         ActivityResultContracts.PickMultipleVisualMedia(),
     ) { uris ->
         if (uris.isNotEmpty()) viewModel.onAttachImagesPicked(uris)
+    }
+    val templatePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::onAttachTemplatePicked)
     }
     val saveDocumentLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument(DOCX_MIME_TYPE),
@@ -150,6 +155,9 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 if (uiState.canGenerateDocument) {
                     GenerateDocumentRow(isBuilding = uiState.isBuildingDocument, onClick = viewModel::onGenerateDocumentClick)
                 }
+                if (uiState.canApplyTemplate) {
+                    ApplyTemplateRow(isBuilding = uiState.isBuildingDocument, onClick = viewModel::onApplyTemplateClick)
+                }
                 ChatInputBar(
                     text = uiState.inputText,
                     onTextChange = viewModel::onInputChange,
@@ -160,9 +168,11 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                         )
                     },
+                    onAttachTemplate = { templatePickerLauncher.launch(arrayOf(DOCX_MIME_TYPE)) },
                     canSend = uiState.canSend,
                     canAttachPdf = uiState.canAttachPdf,
                     canAttachImage = uiState.canAttachImages,
+                    canAttachTemplate = uiState.canAttachTemplate,
                 )
             }
         },
@@ -171,11 +181,14 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             if (!uiState.hasApiKey) {
                 ApiKeyMissingBanner(onOpenSettings = onOpenSettings)
             }
-            if (uiState.isLoadingPdf || uiState.isLoadingImages) {
+            if (uiState.isLoadingPdf || uiState.isLoadingImages || uiState.isLoadingTemplate) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
             if (uiState.hasPdf) {
                 PdfChip(fileName = uiState.pdfFileName.orEmpty(), pageCount = uiState.pdfPageCount)
+            }
+            if (uiState.hasTemplate) {
+                TemplateChip(fileName = uiState.templateFileName.orEmpty(), paragraphCount = uiState.templateParagraphCount)
             }
             LazyColumn(
                 state = listState,

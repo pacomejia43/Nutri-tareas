@@ -2,6 +2,7 @@ package com.nutritareas.app.ui.chat
 
 import android.app.Application
 import android.net.Uri
+import android.util.Base64
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -20,6 +21,11 @@ import com.nutritareas.app.data.chat.ChatMessage
 import com.nutritareas.app.data.chat.ChatRole
 import com.nutritareas.app.data.chat.ChatSession
 import com.nutritareas.app.data.docx.DocxGenerator
+import com.nutritareas.app.data.docx.DocxTemplate
+import com.nutritareas.app.data.docx.DocxTemplateException
+import com.nutritareas.app.data.docx.DocxTemplateReader
+import com.nutritareas.app.data.docx.DocxTemplateWriter
+import com.nutritareas.app.data.docx.parseTemplateEdits
 import com.nutritareas.app.data.image.ImageProcessor
 import com.nutritareas.app.data.image.ImageReadException
 import com.nutritareas.app.data.pdf.PdfReadException
@@ -43,6 +49,7 @@ class ChatViewModel(
     private val chatHistoryStore: ChatHistoryStore,
     private val pdfTextExtractor: PdfTextExtractor,
     private val imageProcessor: ImageProcessor,
+    private val docxTemplateReader: DocxTemplateReader,
     private val claudeAssistantClient: AssistantClient,
     private val geminiAssistantClient: AssistantClient,
 ) : AndroidViewModel(application) {
@@ -64,6 +71,8 @@ class ChatViewModel(
                     messages = session.messages,
                     pdfFileName = session.pdfFileName,
                     pdfPageCount = session.pdfPageCount,
+                    templateFileName = session.templateFileName,
+                    templateParagraphCount = session.templateParagraphs.size,
                 )
             }
         }
@@ -147,6 +156,42 @@ class ChatViewModel(
         }
     }
 
+    /** Her existing Word/Google Docs template (same design every time, only a few fields change). */
+    fun onAttachTemplatePicked(uri: Uri) {
+        if (_uiState.value.isLoadingTemplate) return
+        _uiState.update { it.copy(isLoadingTemplate = true, errorMessage = null) }
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            try {
+                val template = docxTemplateReader.read(uri)
+                session = session.copy(
+                    templateFileName = template.fileName,
+                    templateParagraphs = template.paragraphs,
+                    templateEntriesBase64 = template.entries.mapValues { (_, bytes) -> Base64.encodeToString(bytes, Base64.NO_WRAP) },
+                )
+                persistSession()
+                _uiState.update {
+                    it.copy(
+                        isLoadingTemplate = false,
+                        templateFileName = template.fileName,
+                        templateParagraphCount = template.paragraphs.size,
+                    )
+                }
+                val listing = template.paragraphs.mapIndexed { index, text ->
+                    "[$index] " + text.ifBlank { app.getString(R.string.template_paragraph_empty) }
+                }.joinToString("\n")
+                sendTurn(app.getString(R.string.template_attach_intro, template.fileName, listing), isDocumentGeneration = false)
+            } catch (e: DocxTemplateException) {
+                _uiState.update { it.copy(isLoadingTemplate = false, errorMessage = app.getString(R.string.error_template_read)) }
+            }
+        }
+    }
+
+    fun onApplyTemplateClick() {
+        if (!_uiState.value.canApplyTemplate) return
+        sendTurn(AssistantPersona.APPLY_TEMPLATE_REQUEST, isDocumentGeneration = false, isTemplateApplication = true)
+    }
+
     fun onNewConversationClick() {
         _uiState.update { it.copy(showNewConversationConfirm = true) }
     }
@@ -194,7 +239,12 @@ class ChatViewModel(
         }
     }
 
-    private fun sendTurn(userText: String, isDocumentGeneration: Boolean, images: List<ChatImageAttachment> = emptyList()) {
+    private fun sendTurn(
+        userText: String,
+        isDocumentGeneration: Boolean,
+        images: List<ChatImageAttachment> = emptyList(),
+        isTemplateApplication: Boolean = false,
+    ) {
         val app = getApplication<Application>()
         val apiKey = currentSettings.activeApiKey
         if (apiKey.isNullOrBlank()) {
@@ -236,6 +286,7 @@ class ChatViewModel(
                     is AssistantStreamEvent.Completed -> {
                         appendAssistantMessage(event.fullText, isError = false)
                         if (isDocumentGeneration) buildDocument(event.fullText)
+                        if (isTemplateApplication) applyTemplateEdits(event.fullText)
                     }
 
                     is AssistantStreamEvent.Failed -> {
@@ -284,6 +335,36 @@ class ChatViewModel(
         }
     }
 
+    private fun applyTemplateEdits(assistantText: String) {
+        val app = getApplication<Application>()
+        val edits = parseTemplateEdits(assistantText)
+        if (edits.isEmpty()) {
+            _uiState.update { it.copy(errorMessage = app.getString(R.string.error_template_apply)) }
+            return
+        }
+        _uiState.update { it.copy(isBuildingDocument = true) }
+        val template = DocxTemplate(
+            fileName = session.templateFileName ?: "plantilla.docx",
+            entries = session.templateEntriesBase64.mapValues { (_, base64) -> Base64.decode(base64, Base64.NO_WRAP) },
+            paragraphs = session.templateParagraphs,
+        )
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val dir = File(app.cacheDir, "documentos").apply { mkdirs() }
+                val fileName = "plantilla_${System.currentTimeMillis()}.docx"
+                val file = File(dir, fileName)
+                DocxTemplateWriter.apply(template, edits, file)
+                readyDocumentFile = file
+                val uri = FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", file)
+                _uiState.update {
+                    it.copy(isBuildingDocument = false, readyDocumentUri = uri, readyDocumentFileName = fileName)
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isBuildingDocument = false, errorMessage = app.getString(R.string.error_generic)) }
+            }
+        }
+    }
+
     private fun errorText(error: AssistantError): String {
         val app = getApplication<Application>()
         return when (error) {
@@ -314,6 +395,7 @@ class ChatViewModel(
                         chatHistoryStore = container.chatHistoryStore,
                         pdfTextExtractor = container.pdfTextExtractor,
                         imageProcessor = container.imageProcessor,
+                        docxTemplateReader = container.docxTemplateReader,
                         claudeAssistantClient = container.claudeAssistantClient,
                         geminiAssistantClient = container.geminiAssistantClient,
                     )

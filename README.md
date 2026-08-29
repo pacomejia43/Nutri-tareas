@@ -15,6 +15,10 @@ App nativa de Android (Kotlin + Jetpack Compose) que funciona como asistente de 
 5. **Funciona con Claude o con Gemini**, a elección — cada uno con su propia clave de API guardada
    por separado; dos botones en Ajustes alternan cuál está activo sin tener que volver a escribir
    ninguna clave.
+6. **Puede editar una plantilla de Word/Google Docs ya existente** (mismo diseño siempre, solo
+   cambian datos como materia, actividad y fecha): se adjunta el archivo `.docx`, se conversa en
+   el chat sobre los cambios y la app genera una copia editada conservando el diseño original
+   intacto (fuentes, estilos, logo...), sin depender de la API de Google ni de credenciales OAuth.
 
 No se distribuye por Google Play: vive únicamente en este repositorio de GitHub y **se
 actualiza a sí misma leyendo los releases de GitHub** (ver [Actualizaciones](#actualizaciones)).
@@ -46,9 +50,17 @@ peso muerto. En su lugar:
 - **Capturas/fotos**: `data/image/ImageProcessor.kt` decodifica la imagen elegida, la reduce a
   como máximo ~1568px de lado largo y la recomprime a JPEG antes de enviarla — de sobra para que
   el modelo lea texto en pantalla, sin mandar varios MB por foto.
-- **Documento editable**: `data/docx/DocxGenerator.kt` construye un `.docx` (OOXML) válido a
-  mano con `java.util.zip`, sin depender de Apache POI ni librerías similares (poco adecuadas
-  para Android). Tiene pruebas unitarias en `app/src/test/.../DocxGeneratorTest.kt`.
+- **Documento editable desde cero**: `data/docx/DocxGenerator.kt` construye un `.docx` (OOXML)
+  válido a mano con `java.util.zip`, sin depender de Apache POI ni librerías similares (poco
+  adecuadas para Android). Tiene pruebas unitarias en `app/src/test/.../DocxGeneratorTest.kt`.
+- **Plantilla existente**: `data/docx/DocxTemplateReader.kt` lee cualquier `.docx` picada
+  (por ejemplo, exportada desde Google Docs) guardando cada entrada del zip byte a byte y
+  extrayendo el texto de cada párrafo de `word/document.xml` por índice. `DocxTemplateWriter.kt`
+  reescribe solo los párrafos indicados (manteniendo el formato del primer *run* de cada uno) y
+  reempaqueta el resto del `.docx` sin tocarlo, así que estilos, fuentes y logo sobreviven
+  intactos. `TemplateEditParser.kt` interpreta la respuesta del modelo (bloques `[[PARRAFO N]]`)
+  para saber qué párrafos reemplazar. Pruebas unitarias en
+  `app/src/test/.../DocxTemplateEditorTest.kt`.
 - **Almacenamiento**: la clave de API de cada proveedor se cifra por separado con una llave de
   Android Keystore (`data/crypto/CryptoManager.kt`, AES-256-GCM) y se guarda vía DataStore
   (`androidx.security:security-crypto` está deprecado, por eso no se usa), junto con cuál de los

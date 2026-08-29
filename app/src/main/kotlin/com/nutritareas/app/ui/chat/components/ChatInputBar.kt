@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -28,9 +29,11 @@ fun ChatInputBar(
     onSend: () -> Unit,
     onAttachPdf: () -> Unit,
     onAttachImage: () -> Unit,
+    onAttachTemplate: () -> Unit,
     canSend: Boolean,
     canAttachPdf: Boolean,
     canAttachImage: Boolean,
+    canAttachTemplate: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Surface(tonalElevation = 3.dp, modifier = modifier) {
@@ -43,6 +46,9 @@ fun ChatInputBar(
             }
             IconButton(onClick = onAttachImage, enabled = canAttachImage) {
                 Icon(Icons.Filled.AddPhotoAlternate, contentDescription = stringResource(R.string.cd_attach_image))
+            }
+            IconButton(onClick = onAttachTemplate, enabled = canAttachTemplate) {
+                Icon(Icons.Filled.UploadFile, contentDescription = stringResource(R.string.cd_attach_template))
             }
             OutlinedTextField(
                 value = text,

@@ -16,6 +16,11 @@
         <item quantity="one">Te adjunté %1$d captura. Léela y dime si necesitas algo de mí antes de empezar a desarrollar las tareas.</item>
         <item quantity="other">Te adjunté %1$d capturas. Léelas y dime si necesitas algo de mí antes de empezar a desarrollar las tareas.</item>
     </plurals>
+    <string name="template_loaded_message">Plantilla cargada: %1$s (%2$d párrafos)</string>
+    <string name="template_attach_intro">He adjuntado la plantilla %1$s. Este es su contenido actual, párrafo por párrafo:\n\n%2$s\n\nDime qué materia, actividad, fecha y contenido quieres para esta vez, y toca \"Aplicar a la plantilla\" cuando quieras que arme el documento.</string>
+    <string name="template_paragraph_empty">(párrafo vacío)</string>
+    <string name="apply_template">Aplicar a la plantilla</string>
+    <string name="applying_template">Aplicando cambios…</string>
     <string name="thinking">Pensando…</string>
     <string name="new_conversation">Nueva conversación</string>
     <string name="new_conversation_confirm_title">¿Empezar de nuevo?</string>
@@ -26,6 +31,8 @@
     <string name="error_no_api_key">Primero configura una clave de API en Ajustes.</string>
     <string name="error_pdf_read">No se pudo leer ese PDF. Intenta con otro archivo.</string>
     <string name="error_image_read">No se pudo leer esa imagen. Intenta con otra.</string>
+    <string name="error_template_read">No se pudo leer esa plantilla. Verifica que sea un archivo .docx válido.</string>
+    <string name="error_template_apply">No identifiqué cambios para aplicar a la plantilla. Pídele a Paco que los aplique de nuevo.</string>
     <string name="error_network">No hay conexión a internet. Revisa tu conexión e inténtalo de nuevo.</string>
     <string name="error_invalid_api_key">Tu clave de API no es válida o fue revocada. Revísala en Ajustes.</string>
     <string name="error_rate_limited">Se alcanzó el límite de uso de la API. Espera un momento e inténtalo de nuevo.</string>
@@ -79,6 +86,7 @@
     <!-- Content descriptions -->
     <string name="cd_attach_pdf">Adjuntar PDF</string>
     <string name="cd_attach_image">Adjuntar captura o foto</string>
+    <string name="cd_attach_template">Adjuntar plantilla de Word</string>
     <string name="cd_send">Enviar mensaje</string>
     <string name="cd_settings">Ajustes</string>
     <string name="cd_back">Atrás</string>

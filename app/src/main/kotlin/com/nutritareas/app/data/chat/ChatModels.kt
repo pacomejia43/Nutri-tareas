@@ -22,11 +22,14 @@ data class ChatMessage(
     val imageAttachments: List<ChatImageAttachment> = emptyList(),
 )
 
-/** The full state of "today's" conversation: the transcript plus the PDF it's anchored to, if any. */
+/** The full state of "today's" conversation: the transcript plus the PDF/template it's anchored to, if any. */
 @Serializable
 data class ChatSession(
     val messages: List<ChatMessage> = emptyList(),
     val pdfFileName: String? = null,
     val pdfPageCount: Int = 0,
     val pdfBase64: String? = null,
+    val templateFileName: String? = null,
+    val templateParagraphs: List<String> = emptyList(),
+    val templateEntriesBase64: Map<String, String> = emptyMap(),
 )

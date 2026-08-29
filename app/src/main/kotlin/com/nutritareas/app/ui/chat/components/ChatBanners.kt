@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -58,6 +59,40 @@ fun PdfChip(fileName: String, pageCount: Int, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
         )
+    }
+}
+
+@Composable
+fun TemplateChip(fileName: String, paragraphCount: Int, modifier: Modifier = Modifier) {
+    Surface(
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        shape = MaterialTheme.shapes.medium,
+        modifier = modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.template_loaded_message, fileName, paragraphCount),
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+        )
+    }
+}
+
+@Composable
+fun ApplyTemplateRow(isBuilding: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        OutlinedButton(onClick = onClick, enabled = !isBuilding) {
+            if (isBuilding) {
+                CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp).size(16.dp), strokeWidth = 2.dp)
+                Text(stringResource(R.string.applying_template))
+            } else {
+                Icon(Icons.Filled.EditNote, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                Text(stringResource(R.string.apply_template))
+            }
+        }
     }
 }
 
