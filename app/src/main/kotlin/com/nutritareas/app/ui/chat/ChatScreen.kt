@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -45,7 +46,6 @@ import com.nutritareas.app.R
 import com.nutritareas.app.data.chat.ChatMessage
 import com.nutritareas.app.data.chat.ChatRole
 import com.nutritareas.app.data.settings.AssistantProvider
-import com.nutritareas.app.ui.chat.components.ApiKeyMissingBanner
 import com.nutritareas.app.ui.chat.components.ApplyTemplateRow
 import com.nutritareas.app.ui.chat.components.ChatInputBar
 import com.nutritareas.app.ui.chat.components.DocumentReadyRow
@@ -145,7 +145,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            Column {
+            Column(modifier = Modifier.navigationBarsPadding()) {
                 uiState.readyDocumentUri?.let { uri ->
                     DocumentReadyRow(
                         onSave = { saveDocumentLauncher.launch(uiState.readyDocumentFileName ?: "tareas.docx") },
@@ -178,9 +178,6 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         },
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-            if (!uiState.hasApiKey) {
-                ApiKeyMissingBanner(onOpenSettings = onOpenSettings)
-            }
             if (uiState.isLoadingPdf || uiState.isLoadingImages || uiState.isLoadingTemplate) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }

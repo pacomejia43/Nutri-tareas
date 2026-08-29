@@ -60,7 +60,6 @@
     <string name="model_custom_label">ID del modelo</string>
     <string name="save">Guardar</string>
     <string name="cancel">Cancelar</string>
-    <string name="go_to_settings">Ir a Ajustes</string>
     <string name="check_updates">Buscar actualizaciones</string>
     <string name="checking_updates">Buscando actualizaciones…</string>
     <string name="up_to_date">Ya tienes la última versión (%1$s)</string>
@@ -84,6 +83,7 @@
     <string name="update_open_in_browser">Ver en GitHub</string>
 
     <!-- Content descriptions -->
+    <string name="cd_attach_menu">Adjuntar archivo</string>
     <string name="cd_attach_pdf">Adjuntar PDF</string>
     <string name="cd_attach_image">Adjuntar captura o foto</string>
     <string name="cd_attach_template">Adjuntar plantilla de Word</string>
