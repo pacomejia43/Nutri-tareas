@@ -1,3 +1,6 @@
+import java.util.Base64
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -46,7 +49,7 @@ android {
                 if (!decoded.exists()) {
                     val encoded = file("${rootProject.projectDir}/release-signing/nutri-tareas-release.keystore.base64")
                     if (encoded.exists()) {
-                        decoded.writeBytes(java.util.Base64.getDecoder().decode(encoded.readText().trim()))
+                        decoded.writeBytes(Base64.getDecoder().decode(encoded.readText().trim()))
                     }
                 }
                 decoded
@@ -77,10 +80,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         compose = true
         buildConfig = true
@@ -100,6 +99,12 @@ android {
                 "META-INF/*.kotlin_module",
             )
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 

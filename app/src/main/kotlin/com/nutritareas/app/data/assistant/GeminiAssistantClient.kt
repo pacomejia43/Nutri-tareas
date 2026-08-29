@@ -1,0 +1,166 @@
+package com.nutritareas.app.data.assistant
+
+import com.nutritareas.app.data.chat.ChatImageAttachment
+import com.nutritareas.app.data.chat.ChatMessage
+import com.nutritareas.app.data.chat.ChatRole
+import java.io.IOException
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import okhttp3.Call
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+
+/**
+ * Talks to Gemini via its plain REST API over OkHttp (no official Android SDK dependency needed:
+ * this app already carries OkHttp + kotlinx.serialization for [GeminiModels]). Mirrors
+ * [ClaudeAssistantClient]'s turn-resending behavior: the PDF and any screenshots are re-attached
+ * as inline data on whichever turn first carried them, since this API is stateless too.
+ */
+class GeminiAssistantClient : AssistantClient {
+
+    private val json = Json {
+        ignoreUnknownKeys = true
+        explicitNulls = false
+    }
+
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(180, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
+        .build()
+
+    override fun streamTurn(
+        apiKey: String,
+        modelId: String,
+        history: List<ChatMessage>,
+        pdfBase64: String?,
+        pdfFileName: String?,
+        newUserText: String,
+        newUserImages: List<ChatImageAttachment>,
+    ): Flow<AssistantStreamEvent> = callbackFlow {
+        var activeCall: Call? = null
+
+        val job = launch(Dispatchers.IO) {
+            val textBuilder = StringBuilder()
+            try {
+                val requestBody = buildRequestBody(history, pdfBase64, newUserText, newUserImages)
+                val request = Request.Builder()
+                    .url("$BASE_URL/models/$modelId:streamGenerateContent?alt=sse")
+                    .header("x-goog-api-key", apiKey)
+                    .post(json.encodeToString(requestBody).toRequestBody(JSON_MEDIA_TYPE))
+                    .build()
+
+                val call = httpClient.newCall(request)
+                activeCall = call
+                call.execute().use { response ->
+                    if (!response.isSuccessful) {
+                        trySend(AssistantStreamEvent.Failed(errorForStatus(response.code)))
+                        return@use
+                    }
+                    val source = response.body?.source() ?: throw IOException("Respuesta vacía.")
+                    while (!source.exhausted()) {
+                        val line = source.readUtf8Line() ?: break
+                        val payload = sseDataPayload(line) ?: continue
+                        val chunk = runCatching { json.decodeFromString<GeminiStreamChunk>(payload) }.getOrNull()
+                        val chunkText = chunk?.candidates?.firstOrNull()?.content?.parts
+                            ?.joinToString("") { it.text.orEmpty() }
+                            .orEmpty()
+                        if (chunkText.isNotEmpty()) {
+                            textBuilder.append(chunkText)
+                            trySend(AssistantStreamEvent.Delta(chunkText))
+                        }
+                    }
+                    trySend(AssistantStreamEvent.Completed(textBuilder.toString()))
+                }
+            } catch (e: IOException) {
+                trySend(AssistantStreamEvent.Failed(AssistantError.Network(e)))
+            } catch (e: Exception) {
+                trySend(AssistantStreamEvent.Failed(AssistantError.Unknown(e)))
+            }
+            close()
+        }
+        awaitClose {
+            job.cancel()
+            activeCall?.cancel()
+        }
+    }
+
+    /** Builds the request contents, placing the PDF/images on the same turn they were first sent on. */
+    internal fun buildRequestBody(
+        history: List<ChatMessage>,
+        pdfBase64: String?,
+        newUserText: String,
+        newUserImages: List<ChatImageAttachment>,
+    ): GeminiRequest {
+        val contents = mutableListOf<GeminiContent>()
+        var pdfAttached = false
+        for (message in history) {
+            val attachPdfHere = !pdfAttached && message.role == ChatRole.USER && pdfBase64 != null
+            if (attachPdfHere) pdfAttached = true
+            contents += toGeminiContent(
+                role = message.role,
+                text = message.text,
+                images = message.imageAttachments,
+                pdfBase64 = if (attachPdfHere) pdfBase64 else null,
+            )
+        }
+
+        val attachPdfOnNewTurn = !pdfAttached && pdfBase64 != null
+        contents += toGeminiContent(
+            role = ChatRole.USER,
+            text = newUserText,
+            images = newUserImages,
+            pdfBase64 = if (attachPdfOnNewTurn) pdfBase64 else null,
+        )
+
+        return GeminiRequest(
+            contents = contents,
+            systemInstruction = GeminiContent(parts = listOf(GeminiPart(text = AssistantPersona.systemPrompt))),
+        )
+    }
+
+    private fun toGeminiContent(
+        role: ChatRole,
+        text: String,
+        images: List<ChatImageAttachment>,
+        pdfBase64: String?,
+    ): GeminiContent {
+        val parts = mutableListOf<GeminiPart>()
+        if (pdfBase64 != null) {
+            parts += GeminiPart(inlineData = GeminiInlineData(mimeType = "application/pdf", data = pdfBase64))
+        }
+        for (image in images) {
+            parts += GeminiPart(inlineData = GeminiInlineData(mimeType = image.mimeType, data = image.base64))
+        }
+        if (text.isNotEmpty()) parts += GeminiPart(text = text)
+        return GeminiContent(role = if (role == ChatRole.USER) "user" else "model", parts = parts)
+    }
+
+    private fun errorForStatus(code: Int): AssistantError = when (code) {
+        401, 403 -> AssistantError.InvalidApiKey(IOException("HTTP $code"))
+        404 -> AssistantError.ModelNotFound(IOException("HTTP $code"))
+        429 -> AssistantError.RateLimited(IOException("HTTP $code"))
+        in 500..599 -> AssistantError.ServerError(IOException("HTTP $code"))
+        else -> AssistantError.Unknown(IOException("HTTP $code"))
+    }
+
+    companion object {
+        private const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
+        private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+
+        /** Extracts the payload from an SSE `data: {...}` line, or null for any other SSE line (comments, blanks, other fields). */
+        internal fun sseDataPayload(line: String): String? {
+            if (!line.startsWith("data:")) return null
+            return line.removePrefix("data:").trim().takeIf { it.isNotEmpty() }
+        }
+    }
+}

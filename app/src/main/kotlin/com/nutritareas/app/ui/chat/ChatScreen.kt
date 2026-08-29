@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -37,10 +39,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nutritareas.app.R
 import com.nutritareas.app.data.chat.ChatMessage
 import com.nutritareas.app.data.chat.ChatRole
+import com.nutritareas.app.data.settings.AssistantProvider
 import com.nutritareas.app.ui.chat.components.ApiKeyMissingBanner
 import com.nutritareas.app.ui.chat.components.ChatInputBar
 import com.nutritareas.app.ui.chat.components.DocumentReadyRow
@@ -64,6 +68,11 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
 
     val pdfPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::onAttachPdfPicked)
+    }
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(),
+    ) { uris ->
+        if (uris.isNotEmpty()) viewModel.onAttachImagesPicked(uris)
     }
     val saveDocumentLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument(DOCX_MIME_TYPE),
@@ -110,7 +119,15 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.chat_title)) },
+                title = {
+                    Column {
+                        Text(stringResource(R.string.chat_title))
+                        Text(
+                            text = providerLabel(uiState.activeProvider),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                },
                 actions = {
                     IconButton(onClick = viewModel::onNewConversationClick) {
                         Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.new_conversation))
@@ -138,8 +155,14 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                     onTextChange = viewModel::onInputChange,
                     onSend = viewModel::onSendClick,
                     onAttachPdf = { pdfPickerLauncher.launch(arrayOf("application/pdf")) },
+                    onAttachImage = {
+                        imagePickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    },
                     canSend = uiState.canSend,
-                    canAttach = uiState.canAttachPdf,
+                    canAttachPdf = uiState.canAttachPdf,
+                    canAttachImage = uiState.canAttachImages,
                 )
             }
         },
@@ -148,7 +171,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             if (!uiState.hasApiKey) {
                 ApiKeyMissingBanner(onOpenSettings = onOpenSettings)
             }
-            if (uiState.isLoadingPdf) {
+            if (uiState.isLoadingPdf || uiState.isLoadingImages) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
             if (uiState.hasPdf) {
@@ -180,6 +203,12 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun providerLabel(provider: AssistantProvider): String = when (provider) {
+    AssistantProvider.CLAUDE -> stringResource(R.string.provider_claude)
+    AssistantProvider.GEMINI -> stringResource(R.string.provider_gemini)
 }
 
 private fun shareDocument(context: Context, uri: Uri) {

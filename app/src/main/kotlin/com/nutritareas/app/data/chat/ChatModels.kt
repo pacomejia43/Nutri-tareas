@@ -5,6 +5,13 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class ChatRole { USER, ASSISTANT }
 
+/** A photo/screenshot attached to a user message, kept as base64 so the flat JSON session file carries it whole. */
+@Serializable
+data class ChatImageAttachment(
+    val base64: String,
+    val mimeType: String,
+)
+
 @Serializable
 data class ChatMessage(
     val id: String,
@@ -12,6 +19,7 @@ data class ChatMessage(
     val text: String,
     val timestampEpochMillis: Long,
     val isError: Boolean = false,
+    val imageAttachments: List<ChatImageAttachment> = emptyList(),
 )
 
 /** The full state of "today's" conversation: the transcript plus the PDF it's anchored to, if any. */

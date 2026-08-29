@@ -2,6 +2,7 @@ package com.nutritareas.app.ui.chat
 
 import android.net.Uri
 import com.nutritareas.app.data.chat.ChatMessage
+import com.nutritareas.app.data.settings.AssistantProvider
 
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
@@ -11,6 +12,7 @@ data class ChatUiState(
     val isAssistantResponding: Boolean = false,
     val streamingText: String = "",
     val isLoadingPdf: Boolean = false,
+    val isLoadingImages: Boolean = false,
     val isBuildingDocument: Boolean = false,
     val readyDocumentUri: Uri? = null,
     val readyDocumentFileName: String? = null,
@@ -18,9 +20,11 @@ data class ChatUiState(
     val infoMessage: String? = null,
     val showNewConversationConfirm: Boolean = false,
     val hasApiKey: Boolean = true,
+    val activeProvider: AssistantProvider = AssistantProvider.CLAUDE,
 ) {
     val hasPdf: Boolean get() = pdfFileName != null
     val canSend: Boolean get() = !isAssistantResponding && inputText.isNotBlank()
     val canGenerateDocument: Boolean get() = !isAssistantResponding && !isBuildingDocument && messages.isNotEmpty()
     val canAttachPdf: Boolean get() = !hasPdf && !isAssistantResponding && !isLoadingPdf
+    val canAttachImages: Boolean get() = !isAssistantResponding && !isLoadingImages
 }

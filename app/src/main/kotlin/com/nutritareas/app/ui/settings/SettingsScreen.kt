@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -23,6 +24,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -42,6 +46,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nutritareas.app.R
+import com.nutritareas.app.data.settings.AssistantProvider
 import com.nutritareas.app.ui.update.UpdateViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,15 +96,109 @@ fun SettingsScreen(onBack: () -> Unit) {
                 .fillMaxWidth()
                 .padding(16.dp),
         ) {
-            SectionTitle(stringResource(R.string.api_key_label))
-            ApiKeySection(uiState = uiState, viewModel = viewModel)
+            SectionTitle(stringResource(R.string.provider_section_title))
+            Text(
+                stringResource(R.string.provider_section_hint),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
+            )
+            ProviderToggle(activeProvider = uiState.activeProvider, onSelect = viewModel::onProviderSelected)
 
             Spacer(Modifier.height(24.dp))
             HorizontalDivider()
             Spacer(Modifier.height(24.dp))
 
-            SectionTitle(stringResource(R.string.model_label))
-            ModelSection(uiState = uiState, viewModel = viewModel)
+            SectionTitle(stringResource(R.string.provider_claude))
+            ApiKeySection(
+                isEditing = uiState.isEditingClaudeKey,
+                keyInput = uiState.claudeKeyInput,
+                onKeyInputChange = viewModel::onClaudeKeyInputChange,
+                hasStoredKey = uiState.hasStoredClaudeKey,
+                onSave = viewModel::onSaveClaudeKey,
+                onCancel = viewModel::onCancelEditingClaudeKey,
+                onStartEditing = viewModel::onStartEditingClaudeKey,
+                onClear = viewModel::onClearClaudeKey,
+                placeholder = stringResource(R.string.claude_api_key_placeholder),
+                hint = stringResource(R.string.claude_api_key_hint),
+            )
+            Spacer(Modifier.height(16.dp))
+            Text(stringResource(R.string.model_label), style = MaterialTheme.typography.titleSmall)
+            ModelOptionsColumn(
+                options = listOf(
+                    ModelRadioItem(
+                        label = stringResource(R.string.model_opus),
+                        selected = uiState.selectedClaudeModelOption == ClaudeModelOption.OPUS,
+                        onClick = { viewModel.onClaudeModelOptionSelected(ClaudeModelOption.OPUS) },
+                    ),
+                    ModelRadioItem(
+                        label = stringResource(R.string.model_sonnet),
+                        selected = uiState.selectedClaudeModelOption == ClaudeModelOption.SONNET,
+                        onClick = { viewModel.onClaudeModelOptionSelected(ClaudeModelOption.SONNET) },
+                    ),
+                    ModelRadioItem(
+                        label = stringResource(R.string.model_haiku),
+                        selected = uiState.selectedClaudeModelOption == ClaudeModelOption.HAIKU,
+                        onClick = { viewModel.onClaudeModelOptionSelected(ClaudeModelOption.HAIKU) },
+                    ),
+                    ModelRadioItem(
+                        label = stringResource(R.string.model_custom),
+                        selected = uiState.selectedClaudeModelOption == ClaudeModelOption.CUSTOM,
+                        onClick = { viewModel.onClaudeModelOptionSelected(ClaudeModelOption.CUSTOM) },
+                    ),
+                ),
+                showCustomField = uiState.selectedClaudeModelOption == ClaudeModelOption.CUSTOM,
+                customModelId = uiState.customClaudeModelId,
+                onCustomModelIdChange = viewModel::onCustomClaudeModelIdChange,
+                customFieldLabel = stringResource(R.string.model_custom_label),
+            )
+
+            Spacer(Modifier.height(24.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(24.dp))
+
+            SectionTitle(stringResource(R.string.provider_gemini))
+            ApiKeySection(
+                isEditing = uiState.isEditingGeminiKey,
+                keyInput = uiState.geminiKeyInput,
+                onKeyInputChange = viewModel::onGeminiKeyInputChange,
+                hasStoredKey = uiState.hasStoredGeminiKey,
+                onSave = viewModel::onSaveGeminiKey,
+                onCancel = viewModel::onCancelEditingGeminiKey,
+                onStartEditing = viewModel::onStartEditingGeminiKey,
+                onClear = viewModel::onClearGeminiKey,
+                placeholder = stringResource(R.string.gemini_api_key_placeholder),
+                hint = stringResource(R.string.gemini_api_key_hint),
+            )
+            Spacer(Modifier.height(16.dp))
+            Text(stringResource(R.string.model_label), style = MaterialTheme.typography.titleSmall)
+            ModelOptionsColumn(
+                options = listOf(
+                    ModelRadioItem(
+                        label = stringResource(R.string.model_gemini_pro),
+                        selected = uiState.selectedGeminiModelOption == GeminiModelOption.PRO,
+                        onClick = { viewModel.onGeminiModelOptionSelected(GeminiModelOption.PRO) },
+                    ),
+                    ModelRadioItem(
+                        label = stringResource(R.string.model_gemini_flash),
+                        selected = uiState.selectedGeminiModelOption == GeminiModelOption.FLASH,
+                        onClick = { viewModel.onGeminiModelOptionSelected(GeminiModelOption.FLASH) },
+                    ),
+                    ModelRadioItem(
+                        label = stringResource(R.string.model_gemini_flash_lite),
+                        selected = uiState.selectedGeminiModelOption == GeminiModelOption.FLASH_LITE,
+                        onClick = { viewModel.onGeminiModelOptionSelected(GeminiModelOption.FLASH_LITE) },
+                    ),
+                    ModelRadioItem(
+                        label = stringResource(R.string.model_custom),
+                        selected = uiState.selectedGeminiModelOption == GeminiModelOption.CUSTOM,
+                        onClick = { viewModel.onGeminiModelOptionSelected(GeminiModelOption.CUSTOM) },
+                    ),
+                ),
+                showCustomField = uiState.selectedGeminiModelOption == GeminiModelOption.CUSTOM,
+                customModelId = uiState.customGeminiModelId,
+                onCustomModelIdChange = viewModel::onCustomGeminiModelIdChange,
+                customFieldLabel = stringResource(R.string.model_custom_label),
+            )
 
             Spacer(Modifier.height(24.dp))
             HorizontalDivider()
@@ -145,31 +244,61 @@ private fun SectionTitle(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ApiKeySection(uiState: SettingsUiState, viewModel: SettingsViewModel) {
-    if (uiState.isEditingApiKey) {
+private fun ProviderToggle(activeProvider: AssistantProvider, onSelect: (AssistantProvider) -> Unit) {
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        SegmentedButton(
+            selected = activeProvider == AssistantProvider.CLAUDE,
+            onClick = { onSelect(AssistantProvider.CLAUDE) },
+            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+            label = { Text(stringResource(R.string.provider_claude)) },
+        )
+        SegmentedButton(
+            selected = activeProvider == AssistantProvider.GEMINI,
+            onClick = { onSelect(AssistantProvider.GEMINI) },
+            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+            label = { Text(stringResource(R.string.provider_gemini)) },
+        )
+    }
+}
+
+@Composable
+private fun ApiKeySection(
+    isEditing: Boolean,
+    keyInput: String,
+    onKeyInputChange: (String) -> Unit,
+    hasStoredKey: Boolean,
+    onSave: () -> Unit,
+    onCancel: () -> Unit,
+    onStartEditing: () -> Unit,
+    onClear: () -> Unit,
+    placeholder: String,
+    hint: String,
+) {
+    if (isEditing) {
         Column {
             OutlinedTextField(
-                value = uiState.apiKeyInput,
-                onValueChange = viewModel::onApiKeyInputChange,
+                value = keyInput,
+                onValueChange = onKeyInputChange,
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                placeholder = { Text(stringResource(R.string.api_key_placeholder)) },
+                placeholder = { Text(placeholder) },
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true,
             )
             Text(
-                stringResource(R.string.api_key_hint),
+                hint,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
             )
             Row {
-                Button(onClick = viewModel::onSaveApiKey, enabled = uiState.apiKeyInput.isNotBlank()) {
+                Button(onClick = onSave, enabled = keyInput.isNotBlank()) {
                     Text(stringResource(R.string.save))
                 }
-                if (uiState.hasStoredApiKey) {
+                if (hasStoredKey) {
                     Spacer(Modifier.width(8.dp))
-                    TextButton(onClick = viewModel::onCancelEditingApiKey) { Text(stringResource(R.string.cancel)) }
+                    TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
                 }
             }
         }
@@ -179,41 +308,32 @@ private fun ApiKeySection(uiState: SettingsUiState, viewModel: SettingsViewModel
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(stringResource(R.string.api_key_saved), modifier = Modifier.weight(1f))
-            TextButton(onClick = viewModel::onStartEditingApiKey) { Text(stringResource(R.string.save)) }
-            TextButton(onClick = viewModel::onClearApiKey) { Text(stringResource(R.string.api_key_clear)) }
+            TextButton(onClick = onStartEditing) { Text(stringResource(R.string.save)) }
+            TextButton(onClick = onClear) { Text(stringResource(R.string.api_key_clear)) }
         }
     }
 }
 
+private data class ModelRadioItem(val label: String, val selected: Boolean, val onClick: () -> Unit)
+
 @Composable
-private fun ModelSection(uiState: SettingsUiState, viewModel: SettingsViewModel) {
+private fun ModelOptionsColumn(
+    options: List<ModelRadioItem>,
+    showCustomField: Boolean,
+    customModelId: String,
+    onCustomModelIdChange: (String) -> Unit,
+    customFieldLabel: String,
+) {
     Column(modifier = Modifier.padding(top = 8.dp)) {
-        ModelRadioOption(
-            label = stringResource(R.string.model_opus),
-            selected = uiState.selectedModelOption == ModelOption.OPUS,
-            onClick = { viewModel.onModelOptionSelected(ModelOption.OPUS) },
-        )
-        ModelRadioOption(
-            label = stringResource(R.string.model_sonnet),
-            selected = uiState.selectedModelOption == ModelOption.SONNET,
-            onClick = { viewModel.onModelOptionSelected(ModelOption.SONNET) },
-        )
-        ModelRadioOption(
-            label = stringResource(R.string.model_haiku),
-            selected = uiState.selectedModelOption == ModelOption.HAIKU,
-            onClick = { viewModel.onModelOptionSelected(ModelOption.HAIKU) },
-        )
-        ModelRadioOption(
-            label = stringResource(R.string.model_custom),
-            selected = uiState.selectedModelOption == ModelOption.CUSTOM,
-            onClick = { viewModel.onModelOptionSelected(ModelOption.CUSTOM) },
-        )
-        if (uiState.selectedModelOption == ModelOption.CUSTOM) {
+        options.forEach { item ->
+            ModelRadioOption(label = item.label, selected = item.selected, onClick = item.onClick)
+        }
+        if (showCustomField) {
             OutlinedTextField(
-                value = uiState.customModelId,
-                onValueChange = viewModel::onCustomModelIdChange,
+                value = customModelId,
+                onValueChange = onCustomModelIdChange,
                 modifier = Modifier.fillMaxWidth().padding(start = 32.dp, top = 4.dp),
-                label = { Text(stringResource(R.string.model_custom_label)) },
+                label = { Text(customFieldLabel) },
                 singleLine = true,
             )
         }

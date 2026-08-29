@@ -3,7 +3,7 @@
     <string name="app_name">Nutri-Tareas</string>
 
     <!-- Chat screen -->
-    <string name="chat_title">Nutri-Tareas</string>
+    <string name="chat_title">Paco</string>
     <string name="input_placeholder">Escribe tu mensaje…</string>
     <string name="generate_document">Generar documento</string>
     <string name="generating_document">Generando documento…</string>
@@ -12,6 +12,10 @@
     <string name="share_document">Compartir</string>
     <string name="pdf_loaded_message">PDF cargado: %1$s (%2$d páginas)</string>
     <string name="pdf_attach_intro">He adjuntado %1$s. Léelo y dime si necesitas algo de mí antes de empezar a desarrollar las tareas.</string>
+    <plurals name="image_attach_intro">
+        <item quantity="one">Te adjunté %1$d captura. Léela y dime si necesitas algo de mí antes de empezar a desarrollar las tareas.</item>
+        <item quantity="other">Te adjunté %1$d capturas. Léelas y dime si necesitas algo de mí antes de empezar a desarrollar las tareas.</item>
+    </plurals>
     <string name="thinking">Pensando…</string>
     <string name="new_conversation">Nueva conversación</string>
     <string name="new_conversation_confirm_title">¿Empezar de nuevo?</string>
@@ -19,23 +23,32 @@
 
     <!-- Errors -->
     <string name="error_generic">Ocurrió un error. Inténtalo de nuevo.</string>
-    <string name="error_no_api_key">Primero configura tu clave de API de Anthropic en Ajustes.</string>
+    <string name="error_no_api_key">Primero configura una clave de API en Ajustes.</string>
     <string name="error_pdf_read">No se pudo leer ese PDF. Intenta con otro archivo.</string>
+    <string name="error_image_read">No se pudo leer esa imagen. Intenta con otra.</string>
     <string name="error_network">No hay conexión a internet. Revisa tu conexión e inténtalo de nuevo.</string>
     <string name="error_invalid_api_key">Tu clave de API no es válida o fue revocada. Revísala en Ajustes.</string>
     <string name="error_rate_limited">Se alcanzó el límite de uso de la API. Espera un momento e inténtalo de nuevo.</string>
 
     <!-- Settings -->
     <string name="settings_title">Ajustes</string>
-    <string name="api_key_label">Clave de API de Anthropic</string>
-    <string name="api_key_placeholder">sk-ant-…</string>
-    <string name="api_key_hint">Se guarda cifrada en este dispositivo. Consíguela en console.anthropic.com</string>
+    <string name="provider_section_title">Proveedor de IA</string>
+    <string name="provider_section_hint">Guarda tu clave de cada proveedor una vez y después solo alterna entre ellos con estos botones.</string>
+    <string name="provider_claude">Claude</string>
+    <string name="provider_gemini">Gemini</string>
+    <string name="claude_api_key_placeholder">sk-ant-…</string>
+    <string name="claude_api_key_hint">Se guarda cifrada en este dispositivo. Consíguela en console.anthropic.com</string>
+    <string name="gemini_api_key_placeholder">AIza…</string>
+    <string name="gemini_api_key_hint">Se guarda cifrada en este dispositivo. Consíguela gratis en aistudio.google.com</string>
     <string name="api_key_saved">Clave guardada</string>
     <string name="api_key_clear">Quitar clave</string>
-    <string name="model_label">Modelo de Claude</string>
+    <string name="model_label">Modelo</string>
     <string name="model_opus">Claude Opus 5 (más capaz)</string>
     <string name="model_sonnet">Claude Sonnet 5 (equilibrado)</string>
     <string name="model_haiku">Claude Haiku 4.5 (más económico)</string>
+    <string name="model_gemini_pro">Gemini Pro (más capaz)</string>
+    <string name="model_gemini_flash">Gemini Flash (equilibrado)</string>
+    <string name="model_gemini_flash_lite">Gemini Flash-Lite (más económico)</string>
     <string name="model_custom">Personalizado</string>
     <string name="model_custom_label">ID del modelo</string>
     <string name="save">Guardar</string>
@@ -46,7 +59,7 @@
     <string name="up_to_date">Ya tienes la última versión (%1$s)</string>
     <string name="current_version">Versión actual: %1$s</string>
     <string name="about_title">Acerca de Nutri-Tareas</string>
-    <string name="about_body">Nutri-Tareas lee tus tareas desde un PDF y te ayuda a elaborarlas paso a paso, como un asistente. Al final obtienes un documento editable para revisar antes de entregarlo.</string>
+    <string name="about_body">Nutri-Tareas lee tus tareas desde un PDF o una captura de pantalla y te ayuda a elaborarlas paso a paso junto a Paco, tu asistente. Puedes usar Claude o Gemini como motor de IA y alternar entre ambos cuando quieras. Al final obtienes un documento editable para revisar antes de entregarlo.</string>
 
     <!-- Update -->
     <string name="update_available_title">Nueva versión disponible</string>
@@ -65,6 +78,7 @@
 
     <!-- Content descriptions -->
     <string name="cd_attach_pdf">Adjuntar PDF</string>
+    <string name="cd_attach_image">Adjuntar captura o foto</string>
     <string name="cd_send">Enviar mensaje</string>
     <string name="cd_settings">Ajustes</string>
     <string name="cd_back">Atrás</string>

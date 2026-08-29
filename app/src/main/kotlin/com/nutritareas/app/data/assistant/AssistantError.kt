@@ -6,7 +6,7 @@ sealed class AssistantError(message: String, cause: Throwable? = null) : Excepti
     class InvalidApiKey(cause: Throwable) : AssistantError("Clave de API inválida o sin permisos.", cause)
     class RateLimited(cause: Throwable) : AssistantError("Límite de uso de la API alcanzado.", cause)
     class ModelNotFound(cause: Throwable) : AssistantError("Modelo no encontrado.", cause)
-    class ServerError(cause: Throwable) : AssistantError("Error del servicio de Anthropic.", cause)
+    class ServerError(cause: Throwable) : AssistantError("Error del servicio de IA.", cause)
     class Network(cause: Throwable) : AssistantError("No hay conexión de red.", cause)
     class Unknown(cause: Throwable) : AssistantError(cause.message ?: "Error desconocido.", cause)
 }

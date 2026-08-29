@@ -10,20 +10,20 @@
         android:pathData="M36,28 h36 v52 h-36 z" />
     <!-- Task lines -->
     <path
-        android:strokeColor="#6750A4"
+        android:strokeColor="#C2185B"
         android:strokeWidth="3"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
         android:pathData="M42,38 h20" />
     <path
-        android:strokeColor="#6750A4"
+        android:strokeColor="#C2185B"
         android:strokeWidth="3"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
         android:pathData="M42,46 h14" />
     <!-- Checkmark -->
     <path
-        android:strokeColor="#6750A4"
+        android:strokeColor="#C2185B"
         android:strokeWidth="4.5"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"

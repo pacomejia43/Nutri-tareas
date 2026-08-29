@@ -7,15 +7,18 @@ import com.anthropic.errors.InternalServerException
 import com.anthropic.errors.NotFoundException
 import com.anthropic.errors.RateLimitException
 import com.anthropic.errors.UnauthorizedException
+import com.anthropic.models.messages.Base64ImageSource
 import com.anthropic.models.messages.Base64PdfSource
 import com.anthropic.models.messages.CacheControlEphemeral
 import com.anthropic.models.messages.ContentBlockParam
 import com.anthropic.models.messages.DocumentBlockParam
+import com.anthropic.models.messages.ImageBlockParam
 import com.anthropic.models.messages.MessageCreateParams
 import com.anthropic.models.messages.MessageParam
 import com.anthropic.models.messages.OutputConfig
 import com.anthropic.models.messages.TextBlockParam
 import com.anthropic.models.messages.ThinkingConfigAdaptive
+import com.nutritareas.app.data.chat.ChatImageAttachment
 import com.nutritareas.app.data.chat.ChatMessage
 import com.nutritareas.app.data.chat.ChatRole
 import java.io.IOException
@@ -25,33 +28,29 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 
-sealed interface AssistantStreamEvent {
-    data class Delta(val textChunk: String) : AssistantStreamEvent
-    data class Completed(val fullText: String) : AssistantStreamEvent
-    data class Failed(val error: AssistantError) : AssistantStreamEvent
-}
-
 /**
  * Talks to Claude via the official Anthropic Java SDK. The Messages API is stateless per request,
  * so every call resends the full conversation; the PDF (if any) is re-attached as a cached
- * document block on the first user turn so it isn't re-billed as fresh input on every message.
+ * document block on the first user turn so it isn't re-billed as fresh input on every message,
+ * and any screenshots a user turn carried are re-attached as image blocks on that same turn.
  */
-class ClaudeAssistantClient {
+class ClaudeAssistantClient : AssistantClient {
 
-    fun streamTurn(
+    override fun streamTurn(
         apiKey: String,
         modelId: String,
         history: List<ChatMessage>,
         pdfBase64: String?,
         pdfFileName: String?,
         newUserText: String,
+        newUserImages: List<ChatImageAttachment>,
     ): Flow<AssistantStreamEvent> = callbackFlow {
         val client = AnthropicOkHttpClient.builder().apiKey(apiKey).build()
 
         val job = launch(Dispatchers.IO) {
             val textBuilder = StringBuilder()
             try {
-                val params = buildParams(modelId, history, pdfBase64, pdfFileName, newUserText)
+                val params = buildParams(modelId, history, pdfBase64, pdfFileName, newUserText, newUserImages)
                 client.messages().createStreaming(params).use { streamResponse ->
                     streamResponse.stream().forEach { event ->
                         event.contentBlockDelta().ifPresent { delta ->
@@ -93,6 +92,7 @@ class ClaudeAssistantClient {
         pdfBase64: String?,
         pdfFileName: String?,
         newUserText: String,
+        newUserImages: List<ChatImageAttachment>,
     ): MessageCreateParams {
         val builder = MessageCreateParams.builder()
             .model(modelId)
@@ -103,47 +103,70 @@ class ClaudeAssistantClient {
 
         var pdfAttached = false
         for (message in history) {
-            val isFirstUserTurn = !pdfAttached && message.role == ChatRole.USER && pdfBase64 != null
-            if (isFirstUserTurn) {
-                pdfAttached = true
-                builder.addMessage(userMessageWithPdf(message.text, pdfBase64!!, pdfFileName))
-            } else {
-                builder.addMessage(plainMessage(message.role, message.text))
-            }
+            val attachPdfHere = !pdfAttached && message.role == ChatRole.USER && pdfBase64 != null
+            if (attachPdfHere) pdfAttached = true
+            builder.addMessage(
+                toMessageParam(
+                    role = message.role,
+                    text = message.text,
+                    images = message.imageAttachments,
+                    pdfBase64 = if (attachPdfHere) pdfBase64 else null,
+                    pdfFileName = pdfFileName,
+                ),
+            )
         }
 
-        if (!pdfAttached && pdfBase64 != null) {
-            // The PDF was attached but hasn't appeared in `history` yet (first turn of the
-            // conversation): carry it on the new message being sent right now.
-            builder.addMessage(userMessageWithPdf(newUserText, pdfBase64, pdfFileName))
-        } else {
-            builder.addMessage(plainMessage(ChatRole.USER, newUserText))
-        }
+        val attachPdfOnNewTurn = !pdfAttached && pdfBase64 != null
+        builder.addMessage(
+            toMessageParam(
+                role = ChatRole.USER,
+                text = newUserText,
+                images = newUserImages,
+                pdfBase64 = if (attachPdfOnNewTurn) pdfBase64 else null,
+                pdfFileName = pdfFileName,
+            ),
+        )
 
         return builder.build()
     }
 
-    private fun plainMessage(role: ChatRole, text: String): MessageParam =
-        MessageParam.builder()
-            .role(if (role == ChatRole.USER) MessageParam.Role.USER else MessageParam.Role.ASSISTANT)
-            .content(text)
-            .build()
+    /** Builds one turn. Plain text when there's nothing else to attach; multi-block content otherwise. */
+    private fun toMessageParam(
+        role: ChatRole,
+        text: String,
+        images: List<ChatImageAttachment>,
+        pdfBase64: String?,
+        pdfFileName: String?,
+    ): MessageParam {
+        val sdkRole = if (role == ChatRole.USER) MessageParam.Role.USER else MessageParam.Role.ASSISTANT
+        if (pdfBase64 == null && images.isEmpty()) {
+            return MessageParam.builder().role(sdkRole).content(text).build()
+        }
+        val blocks = mutableListOf<ContentBlockParam>()
+        if (pdfBase64 != null) {
+            val document = DocumentBlockParam.builder()
+                .source(Base64PdfSource.builder().data(pdfBase64).build())
+                .title(pdfFileName ?: "documento.pdf")
+                .cacheControl(CacheControlEphemeral.builder().build())
+                .build()
+            blocks += ContentBlockParam.ofDocument(document)
+        }
+        for (image in images) {
+            val source = Base64ImageSource.builder()
+                .data(image.base64)
+                .mediaType(imageMediaType(image.mimeType))
+                .build()
+            blocks += ContentBlockParam.ofImage(ImageBlockParam.builder().source(source).build())
+        }
+        blocks += ContentBlockParam.ofText(TextBlockParam.builder().text(text).build())
+        return MessageParam.builder().role(sdkRole).contentOfBlockParams(blocks).build()
+    }
 
-    private fun userMessageWithPdf(text: String, pdfBase64: String, pdfFileName: String?): MessageParam {
-        val document = DocumentBlockParam.builder()
-            .source(Base64PdfSource.builder().data(pdfBase64).build())
-            .title(pdfFileName ?: "documento.pdf")
-            .cacheControl(CacheControlEphemeral.builder().build())
-            .build()
-        return MessageParam.builder()
-            .role(MessageParam.Role.USER)
-            .contentOfBlockParams(
-                listOf(
-                    ContentBlockParam.ofDocument(document),
-                    ContentBlockParam.ofText(TextBlockParam.builder().text(text).build()),
-                )
-            )
-            .build()
+    private fun imageMediaType(mimeType: String): Base64ImageSource.MediaType = when (mimeType) {
+        "image/png" -> Base64ImageSource.MediaType.IMAGE_PNG
+        "image/gif" -> Base64ImageSource.MediaType.IMAGE_GIF
+        "image/webp" -> Base64ImageSource.MediaType.IMAGE_WEBP
+        else -> Base64ImageSource.MediaType.IMAGE_JPEG
     }
 
     companion object {

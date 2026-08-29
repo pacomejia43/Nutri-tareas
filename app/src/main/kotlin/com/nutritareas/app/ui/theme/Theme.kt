@@ -11,25 +11,55 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColors = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80,
+    primary = PinkPrimaryDark,
+    onPrimary = OnPinkPrimaryDark,
+    primaryContainer = PinkPrimaryContainerDark,
+    onPrimaryContainer = OnPinkPrimaryContainerDark,
+    secondary = RoseSecondaryDark,
+    onSecondary = OnRoseSecondaryDark,
+    secondaryContainer = RoseSecondaryContainerDark,
+    onSecondaryContainer = OnRoseSecondaryContainerDark,
+    tertiary = RoseTertiaryDark,
+    onTertiary = OnRoseTertiaryDark,
+    tertiaryContainer = RoseTertiaryContainerDark,
+    onTertiaryContainer = OnRoseTertiaryContainerDark,
     background = BackgroundDark,
+    onBackground = OnBackgroundDark,
     surface = SurfaceDark,
+    onSurface = OnSurfaceDark,
+    surfaceVariant = SurfaceVariantDark,
+    onSurfaceVariant = OnSurfaceVariantDark,
+    outline = OutlineDark,
 )
 
 private val LightColors = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40,
+    primary = PinkPrimaryLight,
+    onPrimary = OnPinkPrimaryLight,
+    primaryContainer = PinkPrimaryContainerLight,
+    onPrimaryContainer = OnPinkPrimaryContainerLight,
+    secondary = RoseSecondaryLight,
+    onSecondary = OnRoseSecondaryLight,
+    secondaryContainer = RoseSecondaryContainerLight,
+    onSecondaryContainer = OnRoseSecondaryContainerLight,
+    tertiary = RoseTertiaryLight,
+    onTertiary = OnRoseTertiaryLight,
+    tertiaryContainer = RoseTertiaryContainerLight,
+    onTertiaryContainer = OnRoseTertiaryContainerLight,
     background = BackgroundLight,
+    onBackground = OnBackgroundLight,
     surface = SurfaceLight,
+    onSurface = OnSurfaceLight,
+    surfaceVariant = SurfaceVariantLight,
+    onSurfaceVariant = OnSurfaceVariantLight,
+    outline = OutlineLight,
 )
 
 @Composable
 fun NutriTareasTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    // Off by default: the app has a deliberate pastel pink + white brand palette, and letting
+    // Android 12+ recolor everything from the user's wallpaper (dynamic color) would defeat it.
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colorScheme = when {

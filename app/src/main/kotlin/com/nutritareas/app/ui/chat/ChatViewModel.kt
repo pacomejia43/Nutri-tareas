@@ -10,18 +10,22 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.nutritareas.app.NutriTareasApp
 import com.nutritareas.app.R
+import com.nutritareas.app.data.assistant.AssistantClient
 import com.nutritareas.app.data.assistant.AssistantError
 import com.nutritareas.app.data.assistant.AssistantPersona
 import com.nutritareas.app.data.assistant.AssistantStreamEvent
-import com.nutritareas.app.data.assistant.ClaudeAssistantClient
 import com.nutritareas.app.data.chat.ChatHistoryStore
+import com.nutritareas.app.data.chat.ChatImageAttachment
 import com.nutritareas.app.data.chat.ChatMessage
 import com.nutritareas.app.data.chat.ChatRole
 import com.nutritareas.app.data.chat.ChatSession
 import com.nutritareas.app.data.docx.DocxGenerator
+import com.nutritareas.app.data.image.ImageProcessor
+import com.nutritareas.app.data.image.ImageReadException
 import com.nutritareas.app.data.pdf.PdfReadException
 import com.nutritareas.app.data.pdf.PdfTextExtractor
 import com.nutritareas.app.data.settings.AppSettings
+import com.nutritareas.app.data.settings.AssistantProvider
 import com.nutritareas.app.data.settings.SettingsRepository
 import java.io.File
 import java.util.UUID
@@ -38,7 +42,9 @@ class ChatViewModel(
     private val settingsRepository: SettingsRepository,
     private val chatHistoryStore: ChatHistoryStore,
     private val pdfTextExtractor: PdfTextExtractor,
-    private val assistantClient: ClaudeAssistantClient,
+    private val imageProcessor: ImageProcessor,
+    private val claudeAssistantClient: AssistantClient,
+    private val geminiAssistantClient: AssistantClient,
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -64,7 +70,7 @@ class ChatViewModel(
         viewModelScope.launch {
             settingsRepository.settings.collectLatest { settings ->
                 currentSettings = settings
-                _uiState.update { it.copy(hasApiKey = settings.hasApiKey) }
+                _uiState.update { it.copy(hasApiKey = settings.hasActiveApiKey, activeProvider = settings.activeProvider) }
             }
         }
     }
@@ -120,6 +126,27 @@ class ChatViewModel(
         }
     }
 
+    /** Screenshots/photos of tasks from her phone - read the same way the PDF is, but can arrive any time, more than once. */
+    fun onAttachImagesPicked(uris: List<Uri>) {
+        if (uris.isEmpty() || _uiState.value.isLoadingImages) return
+        _uiState.update { it.copy(isLoadingImages = true, errorMessage = null) }
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            try {
+                val attachments = uris.map { imageProcessor.process(it) }
+                _uiState.update { it.copy(isLoadingImages = false) }
+                val introText = app.resources.getQuantityString(
+                    R.plurals.image_attach_intro,
+                    attachments.size,
+                    attachments.size,
+                )
+                sendTurn(introText, isDocumentGeneration = false, images = attachments)
+            } catch (e: ImageReadException) {
+                _uiState.update { it.copy(isLoadingImages = false, errorMessage = app.getString(R.string.error_image_read)) }
+            }
+        }
+    }
+
     fun onNewConversationClick() {
         _uiState.update { it.copy(showNewConversationConfirm = true) }
     }
@@ -135,7 +162,11 @@ class ChatViewModel(
             session = ChatSession()
             seedGreetingIfNeeded()
             persistSession()
-            _uiState.value = ChatUiState(messages = session.messages, hasApiKey = currentSettings.hasApiKey)
+            _uiState.value = ChatUiState(
+                messages = session.messages,
+                hasApiKey = currentSettings.hasActiveApiKey,
+                activeProvider = currentSettings.activeProvider,
+            )
         }
     }
 
@@ -163,9 +194,9 @@ class ChatViewModel(
         }
     }
 
-    private fun sendTurn(userText: String, isDocumentGeneration: Boolean) {
+    private fun sendTurn(userText: String, isDocumentGeneration: Boolean, images: List<ChatImageAttachment> = emptyList()) {
         val app = getApplication<Application>()
-        val apiKey = currentSettings.apiKey
+        val apiKey = currentSettings.activeApiKey
         if (apiKey.isNullOrBlank()) {
             _uiState.update { it.copy(errorMessage = app.getString(R.string.error_no_api_key)) }
             return
@@ -177,6 +208,7 @@ class ChatViewModel(
             role = ChatRole.USER,
             text = userText,
             timestampEpochMillis = System.currentTimeMillis(),
+            imageAttachments = images,
         )
         session = session.copy(messages = session.messages + userMessage)
         persistSession()
@@ -184,14 +216,17 @@ class ChatViewModel(
             it.copy(messages = session.messages, isAssistantResponding = true, streamingText = "", errorMessage = null)
         }
 
+        val client = assistantClientForActiveProvider()
+        val modelId = currentSettings.activeModelId
         viewModelScope.launch {
-            assistantClient.streamTurn(
+            client.streamTurn(
                 apiKey = apiKey,
-                modelId = currentSettings.modelId,
+                modelId = modelId,
                 history = historyForRequest,
                 pdfBase64 = session.pdfBase64,
                 pdfFileName = session.pdfFileName,
                 newUserText = userText,
+                newUserImages = images,
             ).collect { event ->
                 when (event) {
                     is AssistantStreamEvent.Delta -> {
@@ -209,6 +244,11 @@ class ChatViewModel(
                 }
             }
         }
+    }
+
+    private fun assistantClientForActiveProvider(): AssistantClient = when (currentSettings.activeProvider) {
+        AssistantProvider.CLAUDE -> claudeAssistantClient
+        AssistantProvider.GEMINI -> geminiAssistantClient
     }
 
     private fun appendAssistantMessage(text: String, isError: Boolean) {
@@ -273,7 +313,9 @@ class ChatViewModel(
                         settingsRepository = container.settingsRepository,
                         chatHistoryStore = container.chatHistoryStore,
                         pdfTextExtractor = container.pdfTextExtractor,
-                        assistantClient = container.assistantClient,
+                        imageProcessor = container.imageProcessor,
+                        claudeAssistantClient = container.claudeAssistantClient,
+                        geminiAssistantClient = container.geminiAssistantClient,
                     )
                 }
             }

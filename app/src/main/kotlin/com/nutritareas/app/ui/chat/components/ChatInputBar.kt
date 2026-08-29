@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Icon
@@ -26,8 +27,10 @@ fun ChatInputBar(
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
     onAttachPdf: () -> Unit,
+    onAttachImage: () -> Unit,
     canSend: Boolean,
-    canAttach: Boolean,
+    canAttachPdf: Boolean,
+    canAttachImage: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Surface(tonalElevation = 3.dp, modifier = modifier) {
@@ -35,8 +38,11 @@ fun ChatInputBar(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onAttachPdf, enabled = canAttach) {
+            IconButton(onClick = onAttachPdf, enabled = canAttachPdf) {
                 Icon(Icons.Filled.AttachFile, contentDescription = stringResource(R.string.cd_attach_pdf))
+            }
+            IconButton(onClick = onAttachImage, enabled = canAttachImage) {
+                Icon(Icons.Filled.AddPhotoAlternate, contentDescription = stringResource(R.string.cd_attach_image))
             }
             OutlinedTextField(
                 value = text,
