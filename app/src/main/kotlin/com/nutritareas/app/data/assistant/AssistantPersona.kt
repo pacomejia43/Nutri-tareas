@@ -75,7 +75,7 @@ object AssistantPersona {
 
     const val GREETING: String = "¡Hola, mi amor! Soy Paco, tu asistente de tareas. Cuéntame qué " +
         "tareas tienes: adjunta el PDF o mándame una captura desde tu celular cuando quieras y " +
-        "las vamos armando juntas paso a paso."
+        "las vamos armando juntos paso a paso."
 
     /** Sent as a normal user turn when she taps "Generar documento". */
     const val GENERATE_DOCUMENT_REQUEST: String = "Con todo lo que hemos hablado, genera ahora " +

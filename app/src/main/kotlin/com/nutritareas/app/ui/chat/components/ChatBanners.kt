@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
@@ -91,24 +90,6 @@ fun ApplyTemplateRow(isBuilding: Boolean, onClick: () -> Unit, modifier: Modifie
             } else {
                 Icon(Icons.Filled.EditNote, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
                 Text(stringResource(R.string.apply_template))
-            }
-        }
-    }
-}
-
-@Composable
-fun GenerateDocumentRow(isBuilding: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        OutlinedButton(onClick = onClick, enabled = !isBuilding) {
-            if (isBuilding) {
-                CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp).size(16.dp), strokeWidth = 2.dp)
-                Text(stringResource(R.string.generating_document))
-            } else {
-                Icon(Icons.Filled.Description, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                Text(stringResource(R.string.generate_document))
             }
         }
     }

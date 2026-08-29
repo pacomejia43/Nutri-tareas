@@ -6,7 +6,6 @@
     <string name="chat_title">Paco</string>
     <string name="input_placeholder">Escribe tu mensaje…</string>
     <string name="generate_document">Generar documento</string>
-    <string name="generating_document">Generando documento…</string>
     <string name="document_ready">Documento generado</string>
     <string name="save_document">Guardar</string>
     <string name="share_document">Compartir</string>

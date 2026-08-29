@@ -13,13 +13,16 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,7 +52,6 @@ import com.nutritareas.app.ui.chat.components.ApiKeyMissingBanner
 import com.nutritareas.app.ui.chat.components.ApplyTemplateRow
 import com.nutritareas.app.ui.chat.components.ChatInputBar
 import com.nutritareas.app.ui.chat.components.DocumentReadyRow
-import com.nutritareas.app.ui.chat.components.GenerateDocumentRow
 import com.nutritareas.app.ui.chat.components.MessageBubble
 import com.nutritareas.app.ui.chat.components.PdfChip
 import com.nutritareas.app.ui.chat.components.TemplateChip
@@ -135,7 +137,22 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 },
                 actions = {
                     IconButton(onClick = viewModel::onNewConversationClick) {
-                        Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.new_conversation))
+                        Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.new_conversation))
+                    }
+                    if (uiState.canGenerateDocument || uiState.isBuildingDocument) {
+                        IconButton(
+                            onClick = viewModel::onGenerateDocumentClick,
+                            enabled = !uiState.isBuildingDocument,
+                        ) {
+                            if (uiState.isBuildingDocument) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(
+                                    Icons.Filled.Description,
+                                    contentDescription = stringResource(R.string.generate_document),
+                                )
+                            }
+                        }
                     }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.cd_settings))
@@ -151,9 +168,6 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                         onSave = { saveDocumentLauncher.launch(uiState.readyDocumentFileName ?: "tareas.docx") },
                         onShare = { shareDocument(context, uri) },
                     )
-                }
-                if (uiState.canGenerateDocument) {
-                    GenerateDocumentRow(isBuilding = uiState.isBuildingDocument, onClick = viewModel::onGenerateDocumentClick)
                 }
                 if (uiState.canApplyTemplate) {
                     ApplyTemplateRow(isBuilding = uiState.isBuildingDocument, onClick = viewModel::onApplyTemplateClick)
