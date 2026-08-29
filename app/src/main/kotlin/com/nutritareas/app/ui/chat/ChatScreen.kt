@@ -7,7 +7,9 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,7 +24,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,7 +40,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -48,11 +51,13 @@ import com.nutritareas.app.R
 import com.nutritareas.app.data.chat.ChatMessage
 import com.nutritareas.app.data.chat.ChatRole
 import com.nutritareas.app.data.settings.AssistantProvider
+import com.nutritareas.app.data.template.TemplateDocument
 import com.nutritareas.app.ui.chat.components.ApiKeyMissingBanner
 import com.nutritareas.app.ui.chat.components.ApplyTemplateRow
 import com.nutritareas.app.ui.chat.components.ChatInputBar
 import com.nutritareas.app.ui.chat.components.DocumentReadyRow
 import com.nutritareas.app.ui.chat.components.MessageBubble
+import com.nutritareas.app.ui.chat.components.NutritionBackdrop
 import com.nutritareas.app.ui.chat.components.PdfChip
 import com.nutritareas.app.ui.chat.components.TemplateChip
 import com.nutritareas.app.ui.chat.components.TypingIndicatorBubble
@@ -139,21 +144,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                     IconButton(onClick = viewModel::onNewConversationClick) {
                         Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.new_conversation))
                     }
-                    if (uiState.canGenerateDocument || uiState.isBuildingDocument) {
-                        IconButton(
-                            onClick = viewModel::onGenerateDocumentClick,
-                            enabled = !uiState.isBuildingDocument,
-                        ) {
-                            if (uiState.isBuildingDocument) {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                            } else {
-                                Icon(
-                                    Icons.Filled.Description,
-                                    contentDescription = stringResource(R.string.generate_document),
-                                )
-                            }
-                        }
-                    }
+                    TemplateDocumentButton(onClick = { openTemplateDocument(context) })
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.cd_settings))
                     }
@@ -191,39 +182,45 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             }
         },
     ) { innerPadding ->
-        Column(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-            if (!uiState.hasApiKey) {
-                ApiKeyMissingBanner(onOpenSettings = onOpenSettings)
-            }
-            if (uiState.isLoadingPdf || uiState.isLoadingImages || uiState.isLoadingTemplate) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-            if (uiState.hasPdf) {
-                PdfChip(fileName = uiState.pdfFileName.orEmpty(), pageCount = uiState.pdfPageCount)
-            }
-            if (uiState.hasTemplate) {
-                TemplateChip(fileName = uiState.templateFileName.orEmpty(), paragraphCount = uiState.templateParagraphCount)
-            }
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(uiState.messages, key = { it.id }) { message -> MessageBubble(message) }
-                if (uiState.isAssistantResponding) {
-                    item(key = "streaming") {
-                        if (uiState.streamingText.isEmpty()) {
-                            TypingIndicatorBubble()
-                        } else {
-                            MessageBubble(
-                                ChatMessage(
-                                    id = "streaming",
-                                    role = ChatRole.ASSISTANT,
-                                    text = uiState.streamingText,
-                                    timestampEpochMillis = 0L,
-                                ),
-                            )
+        Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+            NutritionBackdrop(modifier = Modifier.fillMaxSize())
+            Column(modifier = Modifier.fillMaxSize()) {
+                if (!uiState.hasApiKey) {
+                    ApiKeyMissingBanner(onOpenSettings = onOpenSettings)
+                }
+                if (uiState.isLoadingPdf || uiState.isLoadingImages || uiState.isLoadingTemplate) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+                if (uiState.hasPdf) {
+                    PdfChip(fileName = uiState.pdfFileName.orEmpty(), pageCount = uiState.pdfPageCount)
+                }
+                if (uiState.hasTemplate) {
+                    TemplateChip(
+                        fileName = uiState.templateFileName.orEmpty(),
+                        paragraphCount = uiState.templateParagraphCount,
+                    )
+                }
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentPadding = PaddingValues(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(uiState.messages, key = { it.id }) { message -> MessageBubble(message) }
+                    if (uiState.isAssistantResponding) {
+                        item(key = "streaming") {
+                            if (uiState.streamingText.isEmpty()) {
+                                TypingIndicatorBubble()
+                            } else {
+                                MessageBubble(
+                                    ChatMessage(
+                                        id = "streaming",
+                                        role = ChatRole.ASSISTANT,
+                                        text = uiState.streamingText,
+                                        timestampEpochMillis = 0L,
+                                    ),
+                                )
+                            }
                         }
                     }
                 }
@@ -245,4 +242,27 @@ private fun shareDocument(context: Context, uri: Uri) {
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     context.startActivity(Intent.createChooser(sendIntent, context.getString(R.string.share_document)))
+}
+
+/** The always-the-same Google Doc she works from - see [TemplateDocument]. */
+private fun openTemplateDocument(context: Context) {
+    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(TemplateDocument.EDIT_URL)))
+}
+
+@Composable
+private fun TemplateDocumentButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .clip(MaterialTheme.shapes.small)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            Icons.Filled.Description,
+            contentDescription = stringResource(R.string.cd_open_template_document),
+            modifier = Modifier.size(22.dp),
+        )
+        Text(stringResource(R.string.template_document_label), style = MaterialTheme.typography.labelSmall)
+    }
 }

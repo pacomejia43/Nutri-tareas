@@ -24,8 +24,8 @@ data class DocxTemplate(
 )
 
 /**
- * Reads any .docx picked via Storage Access Framework - not just ones [DocxGenerator] made, e.g.
- * a template exported from Google Docs with its own styling that must survive editing untouched.
+ * Reads any .docx picked via Storage Access Framework, e.g. a template exported from Google Docs
+ * with its own styling that must survive editing untouched.
  */
 class DocxTemplateReader(private val context: Context) {
 

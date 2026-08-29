@@ -28,7 +28,6 @@ data class ChatUiState(
     val hasPdf: Boolean get() = pdfFileName != null
     val hasTemplate: Boolean get() = templateFileName != null
     val canSend: Boolean get() = !isAssistantResponding && inputText.isNotBlank()
-    val canGenerateDocument: Boolean get() = !isAssistantResponding && !isBuildingDocument && messages.isNotEmpty()
     val canAttachPdf: Boolean get() = !hasPdf && !isAssistantResponding && !isLoadingPdf
     val canAttachImages: Boolean get() = !isAssistantResponding && !isLoadingImages
     val canAttachTemplate: Boolean get() = !hasTemplate && !isAssistantResponding && !isLoadingTemplate

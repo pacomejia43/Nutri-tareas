@@ -5,7 +5,8 @@
     <!-- Chat screen -->
     <string name="chat_title">Paco</string>
     <string name="input_placeholder">Escribe tu mensaje…</string>
-    <string name="generate_document">Generar documento</string>
+    <string name="template_document_label">Plantilla</string>
+    <string name="cd_open_template_document">Abrir la plantilla en Google Docs</string>
     <string name="document_ready">Documento generado</string>
     <string name="save_document">Guardar</string>
     <string name="share_document">Compartir</string>
@@ -83,6 +84,7 @@
     <string name="update_open_in_browser">Ver en GitHub</string>
 
     <!-- Content descriptions -->
+    <string name="cd_attach_menu">Adjuntar archivo</string>
     <string name="cd_attach_pdf">Adjuntar PDF</string>
     <string name="cd_attach_image">Adjuntar captura o foto</string>
     <string name="cd_attach_template">Adjuntar plantilla de Word</string>
