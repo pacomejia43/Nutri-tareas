@@ -219,7 +219,11 @@ class ChatViewModel(
         sendTurn(AssistantPersona.APPLY_TEMPLATE_REQUEST, isTemplateApplication = true)
     }
 
-    /** Reads the live Google Doc, feeds it into the chat, and asks the assistant for the edits to apply back to it. */
+    /**
+     * Reads the live Google Doc and asks the assistant for the edits to apply back to it. The
+     * doc's full paragraph listing only goes to the model as [sendTurn]'s hidden context - the
+     * visible chat bubble stays as short as tapping "Aplicar a la plantilla" does.
+     */
     fun onSyncTemplateDocClick() {
         if (_uiState.value.isSyncingTemplateDoc || _uiState.value.isAssistantResponding) return
         val app = getApplication<Application>()
@@ -239,9 +243,8 @@ class ChatViewModel(
                 val listing = paragraphs.mapIndexed { index, text ->
                     "[$index] " + text.ifBlank { app.getString(R.string.template_paragraph_empty) }
                 }.joinToString("\n")
-                val introText = app.getString(R.string.google_doc_sync_intro, listing) +
-                    "\n\n" + AssistantPersona.APPLY_TEMPLATE_REQUEST
-                sendTurn(introText, isGoogleDocSync = true)
+                val hiddenContext = app.getString(R.string.google_doc_sync_intro, listing)
+                sendTurn(AssistantPersona.APPLY_TEMPLATE_REQUEST, isGoogleDocSync = true, hiddenContext = hiddenContext)
             } catch (e: TemplateSyncException) {
                 _uiState.update { it.copy(isSyncingTemplateDoc = false, errorMessage = app.getString(R.string.error_template_sync)) }
             }
@@ -296,11 +299,18 @@ class ChatViewModel(
         }
     }
 
+    /**
+     * [hiddenContext] rides along on the request sent to the model but never becomes part of the
+     * visible/stored [ChatMessage] - used for bulky data (like the live Google Doc's full
+     * paragraph listing) the model needs once to decide its reply, but that would otherwise
+     * flood the chat transcript.
+     */
     private fun sendTurn(
         userText: String,
         images: List<ChatImageAttachment> = emptyList(),
         isTemplateApplication: Boolean = false,
         isGoogleDocSync: Boolean = false,
+        hiddenContext: String? = null,
     ) {
         val app = getApplication<Application>()
         val apiKey = currentSettings.activeApiKey
@@ -328,6 +338,7 @@ class ChatViewModel(
 
         val client = assistantClientForActiveProvider()
         val modelId = currentSettings.activeModelId
+        val requestText = if (hiddenContext != null) "$userText\n\n$hiddenContext" else userText
         viewModelScope.launch {
             client.streamTurn(
                 apiKey = apiKey,
@@ -336,7 +347,7 @@ class ChatViewModel(
                 pdfBase64 = session.pdfBase64,
                 pdfFileName = session.pdfFileName,
                 pdfMarkdown = session.pdfMarkdown,
-                newUserText = userText,
+                newUserText = requestText,
                 newUserImages = images,
             ).collect { event ->
                 when (event) {
