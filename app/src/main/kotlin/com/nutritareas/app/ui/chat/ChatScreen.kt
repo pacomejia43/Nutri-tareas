@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -74,6 +75,7 @@ import com.nutritareas.app.ui.chat.components.NutritionBackdrop
 import com.nutritareas.app.ui.chat.components.PdfChip
 import com.nutritareas.app.ui.chat.components.PendingPdfRow
 import com.nutritareas.app.ui.chat.components.TemplateChip
+import com.nutritareas.app.ui.chat.components.TemplateDocPreviewDialog
 import com.nutritareas.app.ui.chat.components.TypingIndicatorBubble
 
 private const val DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -124,6 +126,16 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         }
     }
 
+    if (uiState.isTemplatePreviewOpen) {
+        TemplateDocPreviewDialog(
+            paragraphs = uiState.templatePreviewParagraphs,
+            isLoading = uiState.isTemplatePreviewLoading,
+            errorMessage = uiState.templatePreviewError,
+            onDismiss = viewModel::onCloseTemplatePreview,
+            onRefresh = viewModel::onRefreshTemplatePreviewClick,
+        )
+    }
+
     if (uiState.showNewConversationConfirm) {
         AlertDialog(
             onDismissRequest = viewModel::onDismissNewConversationConfirm,
@@ -161,6 +173,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                     TemplateDocumentButton(
                         isSyncing = uiState.isSyncingTemplateDoc,
                         onOpenDocument = { openTemplateDocument(context) },
+                        onOpenPreview = viewModel::onOpenTemplatePreviewClick,
                         onSyncFromChat = viewModel::onSyncTemplateDocClick,
                     )
                     IconButton(onClick = onOpenSettings) {
@@ -286,6 +299,7 @@ private fun openTemplateDocument(context: Context) {
 private fun TemplateDocumentButton(
     isSyncing: Boolean,
     onOpenDocument: () -> Unit,
+    onOpenPreview: () -> Unit,
     onSyncFromChat: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -315,6 +329,11 @@ private fun TemplateDocumentButton(
                 text = { Text(stringResource(R.string.template_menu_view)) },
                 leadingIcon = { Icon(Icons.Filled.OpenInNew, contentDescription = null) },
                 onClick = { expanded = false; onOpenDocument() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.template_menu_preview)) },
+                leadingIcon = { Icon(Icons.Filled.Visibility, contentDescription = null) },
+                onClick = { expanded = false; onOpenPreview() },
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.template_menu_sync)) },

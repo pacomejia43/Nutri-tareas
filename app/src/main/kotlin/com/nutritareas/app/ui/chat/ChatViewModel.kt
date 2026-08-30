@@ -38,11 +38,14 @@ import com.nutritareas.app.data.template.TemplateSyncException
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class ChatViewModel(
@@ -64,6 +67,7 @@ class ChatViewModel(
     private var currentSettings: AppSettings = AppSettings()
     private var readyDocumentFile: File? = null
     private var pendingPdfContent: PdfContent? = null
+    private var templatePreviewJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -251,6 +255,61 @@ class ChatViewModel(
         }
     }
 
+    /**
+     * Opens the small in-app live preview and starts polling the live Google Doc so she can watch
+     * Paco's edits land without leaving the app or being handed off to the Docs editor (that's
+     * what [openTemplateDocument]/"Ver documento" is for).
+     */
+    fun onOpenTemplatePreviewClick() {
+        val app = getApplication<Application>()
+        val webAppUrl = currentSettings.templateWebAppUrl
+        if (webAppUrl.isNullOrBlank()) {
+            _uiState.update { it.copy(errorMessage = app.getString(R.string.error_no_template_web_app_url)) }
+            return
+        }
+        _uiState.update {
+            it.copy(isTemplatePreviewOpen = true, templatePreviewError = null, templatePreviewParagraphs = emptyList())
+        }
+        startTemplatePreviewPolling(webAppUrl)
+    }
+
+    fun onCloseTemplatePreview() {
+        templatePreviewJob?.cancel()
+        templatePreviewJob = null
+        _uiState.update { it.copy(isTemplatePreviewOpen = false) }
+    }
+
+    fun onRefreshTemplatePreviewClick() {
+        val webAppUrl = currentSettings.templateWebAppUrl ?: return
+        startTemplatePreviewPolling(webAppUrl)
+    }
+
+    /** Keeps fetching [webAppUrl]'s paragraphs every [TEMPLATE_PREVIEW_POLL_INTERVAL_MS] until the preview is closed. */
+    private fun startTemplatePreviewPolling(webAppUrl: String) {
+        templatePreviewJob?.cancel()
+        templatePreviewJob = viewModelScope.launch {
+            while (isActive) {
+                _uiState.update { it.copy(isTemplatePreviewLoading = true) }
+                try {
+                    val paragraphs = templateDocSyncClient.fetchParagraphs(webAppUrl)
+                    _uiState.update {
+                        it.copy(
+                            isTemplatePreviewLoading = false,
+                            templatePreviewParagraphs = paragraphs,
+                            templatePreviewError = null,
+                        )
+                    }
+                } catch (e: TemplateSyncException) {
+                    val app = getApplication<Application>()
+                    _uiState.update {
+                        it.copy(isTemplatePreviewLoading = false, templatePreviewError = app.getString(R.string.error_template_sync))
+                    }
+                }
+                delay(TEMPLATE_PREVIEW_POLL_INTERVAL_MS)
+            }
+        }
+    }
+
     fun onNewConversationClick() {
         _uiState.update { it.copy(showNewConversationConfirm = true) }
     }
@@ -262,6 +321,8 @@ class ChatViewModel(
     fun onConfirmNewConversation() {
         readyDocumentFile = null
         pendingPdfContent = null
+        templatePreviewJob?.cancel()
+        templatePreviewJob = null
         viewModelScope.launch {
             chatHistoryStore.clear()
             session = ChatSession()
@@ -480,6 +541,8 @@ class ChatViewModel(
     }
 
     companion object {
+        private const val TEMPLATE_PREVIEW_POLL_INTERVAL_MS = 4000L
+
         fun factory(application: Application): ViewModelProvider.Factory {
             val container = (application as NutriTareasApp).container
             return viewModelFactory {

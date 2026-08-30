@@ -8,7 +8,11 @@
     <string name="template_document_label">Plantilla</string>
     <string name="cd_open_template_document">Abrir la plantilla en Google Docs</string>
     <string name="template_menu_view">Ver documento</string>
+    <string name="template_menu_preview">Ver en vivo</string>
     <string name="template_menu_sync">Aplicar cambios del chat</string>
+    <string name="template_preview_title">Plantilla en vivo</string>
+    <string name="template_preview_hint">Se actualiza sola cada pocos segundos mientras esta ventana está abierta.</string>
+    <string name="template_preview_empty">La plantilla no tiene contenido todavía.</string>
     <string name="google_doc_sync_intro">Este es el contenido actual de la plantilla de Google Docs, párrafo por párrafo:\n\n%1$s</string>
     <string name="google_doc_synced">Cambios aplicados a la plantilla de Google Docs.</string>
     <string name="document_ready">Documento generado</string>
@@ -107,4 +111,6 @@
     <string name="cd_send">Enviar mensaje</string>
     <string name="cd_settings">Ajustes</string>
     <string name="cd_back">Atrás</string>
+    <string name="cd_refresh_template_preview">Actualizar ahora</string>
+    <string name="cd_close_template_preview">Cerrar vista previa</string>
 </resources>
