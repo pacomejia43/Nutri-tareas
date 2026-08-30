@@ -8,6 +8,8 @@ data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val pdfFileName: String? = null,
     val pdfPageCount: Int = 0,
+    val pendingPdfFileName: String? = null,
+    val pendingPdfPageCount: Int = 0,
     val inputText: String = "",
     val isAssistantResponding: Boolean = false,
     val streamingText: String = "",
@@ -27,9 +29,10 @@ data class ChatUiState(
     val activeProvider: AssistantProvider = AssistantProvider.CLAUDE,
 ) {
     val hasPdf: Boolean get() = pdfFileName != null
+    val hasPendingPdf: Boolean get() = pendingPdfFileName != null
     val hasTemplate: Boolean get() = templateFileName != null
-    val canSend: Boolean get() = !isAssistantResponding && inputText.isNotBlank()
-    val canAttachPdf: Boolean get() = !hasPdf && !isAssistantResponding && !isLoadingPdf
+    val canSend: Boolean get() = !isAssistantResponding && (inputText.isNotBlank() || hasPendingPdf)
+    val canAttachPdf: Boolean get() = !hasPdf && !hasPendingPdf && !isAssistantResponding && !isLoadingPdf
     val canAttachImages: Boolean get() = !isAssistantResponding && !isLoadingImages
     val canAttachTemplate: Boolean get() = !hasTemplate && !isAssistantResponding && !isLoadingTemplate
     val canApplyTemplate: Boolean get() = hasTemplate && !isAssistantResponding && !isBuildingDocument && messages.isNotEmpty()

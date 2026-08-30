@@ -15,6 +15,7 @@
     <string name="save_document">Guardar</string>
     <string name="share_document">Compartir</string>
     <string name="pdf_loaded_message">PDF cargado: %1$s (%2$d páginas)</string>
+    <string name="pdf_pending_message">%1$s (%2$d páginas) listo para enviar. Escribe algo de contexto o toca enviar.</string>
     <string name="pdf_attach_intro">He adjuntado %1$s. Léelo y dime si necesitas algo de mí antes de empezar a desarrollar las tareas.</string>
     <plurals name="image_attach_intro">
         <item quantity="one">Te adjunté %1$d captura. Léela y dime si necesitas algo de mí antes de empezar a desarrollar las tareas.</item>
@@ -100,6 +101,7 @@
     <string name="cd_attach_pdf">Adjuntar PDF</string>
     <string name="cd_attach_image">Adjuntar captura o foto</string>
     <string name="cd_attach_template">Adjuntar plantilla de Word</string>
+    <string name="cd_cancel_pdf_attachment">Quitar PDF adjunto</string>
     <string name="cd_send">Enviar mensaje</string>
     <string name="cd_settings">Ajustes</string>
     <string name="cd_back">Atrás</string>

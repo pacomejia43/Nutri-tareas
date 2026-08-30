@@ -71,6 +71,7 @@ import com.nutritareas.app.ui.chat.components.DocumentReadyRow
 import com.nutritareas.app.ui.chat.components.MessageBubble
 import com.nutritareas.app.ui.chat.components.NutritionBackdrop
 import com.nutritareas.app.ui.chat.components.PdfChip
+import com.nutritareas.app.ui.chat.components.PendingPdfRow
 import com.nutritareas.app.ui.chat.components.TemplateChip
 import com.nutritareas.app.ui.chat.components.TypingIndicatorBubble
 
@@ -180,6 +181,13 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 }
                 if (uiState.canApplyTemplate) {
                     ApplyTemplateRow(isBuilding = uiState.isBuildingDocument, onClick = viewModel::onApplyTemplateClick)
+                }
+                uiState.pendingPdfFileName?.let { fileName ->
+                    PendingPdfRow(
+                        fileName = fileName,
+                        pageCount = uiState.pendingPdfPageCount,
+                        onCancel = viewModel::onCancelPendingPdf,
+                    )
                 }
                 ChatInputBar(
                     text = uiState.inputText,

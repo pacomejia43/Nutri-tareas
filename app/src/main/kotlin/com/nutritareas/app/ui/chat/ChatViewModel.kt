@@ -27,6 +27,7 @@ import com.nutritareas.app.data.docx.DocxTemplateWriter
 import com.nutritareas.app.data.docx.parseTemplateEdits
 import com.nutritareas.app.data.image.ImageProcessor
 import com.nutritareas.app.data.image.ImageReadException
+import com.nutritareas.app.data.pdf.PdfContent
 import com.nutritareas.app.data.pdf.PdfReadException
 import com.nutritareas.app.data.pdf.PdfTextExtractor
 import com.nutritareas.app.data.settings.AppSettings
@@ -62,6 +63,7 @@ class ChatViewModel(
     private var session: ChatSession = ChatSession()
     private var currentSettings: AppSettings = AppSettings()
     private var readyDocumentFile: File? = null
+    private var pendingPdfContent: PdfContent? = null
 
     init {
         viewModelScope.launch {
@@ -102,13 +104,42 @@ class ChatViewModel(
         _uiState.update { it.copy(inputText = text) }
     }
 
+    /**
+     * Plain text sends immediately. A pending PDF (attached but not yet sent - see
+     * [onAttachPdfPicked]) only goes out when she taps send: it's committed to [session] here,
+     * using whatever she typed as the message, or a generic intro if she sent it with no caption.
+     */
     fun onSendClick() {
+        if (_uiState.value.isAssistantResponding) return
         val text = _uiState.value.inputText.trim()
-        if (text.isEmpty() || _uiState.value.isAssistantResponding) return
+        val pendingPdf = pendingPdfContent
+        val messageText = when {
+            text.isNotEmpty() -> text
+            pendingPdf != null -> getApplication<Application>().getString(R.string.pdf_attach_intro, pendingPdf.fileName)
+            else -> return
+        }
         _uiState.update { it.copy(inputText = "") }
-        sendTurn(text)
+        if (pendingPdf != null) {
+            session = session.copy(
+                pdfFileName = pendingPdf.fileName,
+                pdfPageCount = pendingPdf.pageCount,
+                pdfBase64 = if (pendingPdf.markdown == null) pendingPdf.base64 else null,
+                pdfMarkdown = pendingPdf.markdown,
+            )
+            pendingPdfContent = null
+            _uiState.update {
+                it.copy(
+                    pdfFileName = pendingPdf.fileName,
+                    pdfPageCount = pendingPdf.pageCount,
+                    pendingPdfFileName = null,
+                    pendingPdfPageCount = 0,
+                )
+            }
+        }
+        sendTurn(messageText)
     }
 
+    /** Just stages the PDF - it's not sent until she taps send (see [onSendClick]), so she can add context first. */
     fun onAttachPdfPicked(uri: Uri) {
         if (_uiState.value.isLoadingPdf) return
         _uiState.update { it.copy(isLoadingPdf = true, errorMessage = null) }
@@ -116,21 +147,19 @@ class ChatViewModel(
             val app = getApplication<Application>()
             try {
                 val content = pdfTextExtractor.extract(uri)
-                session = session.copy(
-                    pdfFileName = content.fileName,
-                    pdfPageCount = content.pageCount,
-                    pdfBase64 = if (content.markdown == null) content.base64 else null,
-                    pdfMarkdown = content.markdown,
-                )
-                persistSession()
+                pendingPdfContent = content
                 _uiState.update {
-                    it.copy(isLoadingPdf = false, pdfFileName = content.fileName, pdfPageCount = content.pageCount)
+                    it.copy(isLoadingPdf = false, pendingPdfFileName = content.fileName, pendingPdfPageCount = content.pageCount)
                 }
-                sendTurn(app.getString(R.string.pdf_attach_intro, content.fileName))
             } catch (e: PdfReadException) {
                 _uiState.update { it.copy(isLoadingPdf = false, errorMessage = app.getString(R.string.error_pdf_read)) }
             }
         }
+    }
+
+    fun onCancelPendingPdf() {
+        pendingPdfContent = null
+        _uiState.update { it.copy(pendingPdfFileName = null, pendingPdfPageCount = 0) }
     }
 
     /** Screenshots/photos of tasks from her phone - read the same way the PDF is, but can arrive any time, more than once. */
@@ -229,6 +258,7 @@ class ChatViewModel(
 
     fun onConfirmNewConversation() {
         readyDocumentFile = null
+        pendingPdfContent = null
         viewModelScope.launch {
             chatHistoryStore.clear()
             session = ChatSession()
@@ -279,7 +309,10 @@ class ChatViewModel(
             return
         }
 
-        val historyForRequest = session.messages
+        // Claude and Gemini both reject a request whose message list opens with an assistant turn,
+        // which the locally-seeded greeting (see seedGreetingIfNeeded) always is on a fresh chat -
+        // so it's dropped here rather than sent as real conversation history.
+        val historyForRequest = session.messages.dropWhile { it.role == ChatRole.ASSISTANT }
         val userMessage = ChatMessage(
             id = UUID.randomUUID().toString(),
             role = ChatRole.USER,
