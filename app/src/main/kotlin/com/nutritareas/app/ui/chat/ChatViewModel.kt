@@ -116,6 +116,12 @@ class ChatViewModel(
     fun onSendClick() {
         if (_uiState.value.isAssistantResponding) return
         val text = _uiState.value.inputText.trim()
+        val editingId = _uiState.value.editingMessageId
+        if (editingId != null) {
+            if (text.isEmpty()) return
+            resendEditedMessage(editingId, text)
+            return
+        }
         val pendingPdf = pendingPdfContent
         val messageText = when {
             text.isNotEmpty() -> text
@@ -141,6 +147,33 @@ class ChatViewModel(
             }
         }
         sendTurn(messageText)
+    }
+
+    /** Long-pressing her last sent message loads it back into the input bar for editing (see [onSendClick]). */
+    fun onEditLastMessageRequested(messageId: String) {
+        if (_uiState.value.isAssistantResponding) return
+        val message = session.messages.lastOrNull { it.role == ChatRole.USER } ?: return
+        if (message.id != messageId) return
+        _uiState.update { it.copy(inputText = message.text, editingMessageId = messageId) }
+    }
+
+    fun onCancelEditing() {
+        _uiState.update { it.copy(inputText = "", editingMessageId = null) }
+    }
+
+    /**
+     * Drops [messageId] and everything after it (its old assistant reply, or error bubble) and
+     * resends [newText] as a fresh turn - the edited message replaces the original in place
+     * instead of appearing twice.
+     */
+    private fun resendEditedMessage(messageId: String, newText: String) {
+        val index = session.messages.indexOfFirst { it.id == messageId }
+        _uiState.update { it.copy(inputText = "", editingMessageId = null) }
+        if (index == -1) return
+        session = session.copy(messages = session.messages.take(index))
+        persistSession()
+        _uiState.update { it.copy(messages = session.messages) }
+        sendTurn(newText)
     }
 
     /** Just stages the PDF - it's not sent until she taps send (see [onSendClick]), so she can add context first. */
@@ -291,7 +324,7 @@ class ChatViewModel(
             while (isActive) {
                 _uiState.update { it.copy(isTemplatePreviewLoading = true) }
                 try {
-                    val paragraphs = templateDocSyncClient.fetchParagraphs(webAppUrl)
+                    val paragraphs = templateDocSyncClient.fetchPreview(webAppUrl)
                     _uiState.update {
                         it.copy(
                             isTemplatePreviewLoading = false,
@@ -413,28 +446,66 @@ class ChatViewModel(
         val modelId = currentSettings.activeModelId
         val requestText = if (hiddenContext != null) "$userText\n\n$hiddenContext" else userText
         viewModelScope.launch {
-            client.streamTurn(
+            runAssistantTurn(
+                client = client,
                 apiKey = apiKey,
                 modelId = modelId,
                 history = historyForRequest,
-                pdfBase64 = session.pdfBase64,
-                pdfFileName = session.pdfFileName,
-                pdfMarkdown = session.pdfMarkdown,
-                newUserText = requestText,
-                newUserImages = images,
-            ).collect { event ->
-                when (event) {
-                    is AssistantStreamEvent.Delta -> {
-                        _uiState.update { it.copy(streamingText = it.streamingText + event.textChunk) }
-                    }
+                requestText = requestText,
+                images = images,
+                isTemplateApplication = isTemplateApplication,
+                isGoogleDocSync = isGoogleDocSync,
+            )
+        }
+    }
 
-                    is AssistantStreamEvent.Completed -> {
-                        appendAssistantMessage(event.fullText, isError = false)
-                        if (isTemplateApplication) applyTemplateEdits(event.fullText)
-                        if (isGoogleDocSync) applyGoogleDocEdits(event.fullText)
-                    }
+    /**
+     * Streams one assistant turn. A transient server-side failure (Claude/Gemini returning 5xx -
+     * e.g. Gemini's "the model is currently experiencing high demand") is retried silently up to
+     * [MAX_TRANSIENT_RETRIES] times with backoff before it's shown as an error bubble, since these
+     * clear up on their own within a few seconds almost every time.
+     */
+    private suspend fun runAssistantTurn(
+        client: AssistantClient,
+        apiKey: String,
+        modelId: String,
+        history: List<ChatMessage>,
+        requestText: String,
+        images: List<ChatImageAttachment>,
+        isTemplateApplication: Boolean,
+        isGoogleDocSync: Boolean,
+        attempt: Int = 0,
+    ) {
+        client.streamTurn(
+            apiKey = apiKey,
+            modelId = modelId,
+            history = history,
+            pdfBase64 = session.pdfBase64,
+            pdfFileName = session.pdfFileName,
+            pdfMarkdown = session.pdfMarkdown,
+            newUserText = requestText,
+            newUserImages = images,
+        ).collect { event ->
+            when (event) {
+                is AssistantStreamEvent.Delta -> {
+                    _uiState.update { it.copy(streamingText = it.streamingText + event.textChunk) }
+                }
 
-                    is AssistantStreamEvent.Failed -> {
+                is AssistantStreamEvent.Completed -> {
+                    appendAssistantMessage(event.fullText, isError = false)
+                    if (isTemplateApplication) applyTemplateEdits(event.fullText)
+                    if (isGoogleDocSync) applyGoogleDocEdits(event.fullText)
+                }
+
+                is AssistantStreamEvent.Failed -> {
+                    if (event.error is AssistantError.ServerError && attempt < MAX_TRANSIENT_RETRIES) {
+                        _uiState.update { it.copy(streamingText = "") }
+                        delay(TRANSIENT_RETRY_DELAY_MS * (attempt + 1))
+                        runAssistantTurn(
+                            client, apiKey, modelId, history, requestText, images,
+                            isTemplateApplication, isGoogleDocSync, attempt + 1,
+                        )
+                    } else {
                         appendAssistantMessage(errorText(event.error), isError = true)
                         if (isGoogleDocSync) _uiState.update { it.copy(isSyncingTemplateDoc = false) }
                     }
@@ -542,6 +613,8 @@ class ChatViewModel(
 
     companion object {
         private const val TEMPLATE_PREVIEW_POLL_INTERVAL_MS = 4000L
+        private const val MAX_TRANSIENT_RETRIES = 2
+        private const val TRANSIENT_RETRY_DELAY_MS = 1200L
 
         fun factory(application: Application): ViewModelProvider.Factory {
             val container = (application as NutriTareasApp).container

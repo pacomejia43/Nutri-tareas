@@ -3,6 +3,7 @@ package com.nutritareas.app.ui.chat
 import android.net.Uri
 import com.nutritareas.app.data.chat.ChatMessage
 import com.nutritareas.app.data.settings.AssistantProvider
+import com.nutritareas.app.data.template.TemplateParagraph
 
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
@@ -21,11 +22,12 @@ data class ChatUiState(
     val isBuildingDocument: Boolean = false,
     val isSyncingTemplateDoc: Boolean = false,
     val isTemplatePreviewOpen: Boolean = false,
-    val templatePreviewParagraphs: List<String> = emptyList(),
+    val templatePreviewParagraphs: List<TemplateParagraph> = emptyList(),
     val isTemplatePreviewLoading: Boolean = false,
     val templatePreviewError: String? = null,
     val readyDocumentUri: Uri? = null,
     val readyDocumentFileName: String? = null,
+    val editingMessageId: String? = null,
     val errorMessage: String? = null,
     val infoMessage: String? = null,
     val showNewConversationConfirm: Boolean = false,
@@ -35,6 +37,7 @@ data class ChatUiState(
     val hasPdf: Boolean get() = pdfFileName != null
     val hasPendingPdf: Boolean get() = pendingPdfFileName != null
     val hasTemplate: Boolean get() = templateFileName != null
+    val isEditingMessage: Boolean get() = editingMessageId != null
     val canSend: Boolean get() = !isAssistantResponding && (inputText.isNotBlank() || hasPendingPdf)
     val canAttachPdf: Boolean get() = !hasPdf && !hasPendingPdf && !isAssistantResponding && !isLoadingPdf
     val canAttachImages: Boolean get() = !isAssistantResponding && !isLoadingImages

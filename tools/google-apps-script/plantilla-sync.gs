@@ -16,7 +16,8 @@ var DOC_ID = '1gy_S-aNGET0DQDwp8hLKemsyMahGtfAFBH3gyEp80eA';
 
 function doGet(e) {
   try {
-    return jsonResponse_({ ok: true, paragraphs: readParagraphs_() });
+    var snapshot = readDocument_();
+    return jsonResponse_({ ok: true, paragraphs: snapshot.paragraphs, paragraphStyles: snapshot.styles });
   } catch (err) {
     return jsonResponse_({ ok: false, error: String(err) });
   }
@@ -35,7 +36,8 @@ function doPost(e) {
       }
     });
     doc.saveAndClose();
-    return jsonResponse_({ ok: true, paragraphs: readParagraphs_() });
+    var snapshot = readDocument_();
+    return jsonResponse_({ ok: true, paragraphs: snapshot.paragraphs, paragraphStyles: snapshot.styles });
   } catch (err) {
     return jsonResponse_({ ok: false, error: String(err) });
   }
@@ -76,11 +78,22 @@ function applyParagraphEdit_(paragraph, newText) {
   }
 }
 
-function readParagraphs_() {
+// Returns both the plain text (what the assistant reads/edits) and each paragraph's style -
+// "title"/"subtitle"/"normal", the same three looks applyParagraphEdit_ enforces - so the app's
+// "Ver en vivo" preview can render a paragraph the way it actually looks in the Doc.
+function readDocument_() {
   var doc = DocumentApp.openById(DOC_ID);
-  return doc.getBody().getParagraphs().map(function (p) {
-    return p.getText();
+  var Heading = DocumentApp.ParagraphHeading;
+  var paragraphs = [];
+  var styles = [];
+  doc.getBody().getParagraphs().forEach(function (p) {
+    var heading = p.getHeading();
+    var isTitle = heading === Heading.TITLE || heading === Heading.HEADING1;
+    var isSubtitle = heading === Heading.SUBTITLE || heading === Heading.HEADING2 || heading === Heading.HEADING3;
+    paragraphs.push(p.getText());
+    styles.push(isTitle ? 'title' : (isSubtitle ? 'subtitle' : 'normal'));
   });
+  return { paragraphs: paragraphs, styles: styles };
 }
 
 function jsonResponse_(obj) {

@@ -1,6 +1,7 @@
 package com.nutritareas.app.ui.chat.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
@@ -26,20 +28,29 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.nutritareas.app.R
+import com.nutritareas.app.data.template.TemplateParagraph
+import com.nutritareas.app.data.template.TemplateParagraphStyle
 
 /**
  * A small floating window that polls the live Google Doc (see [com.nutritareas.app.data.template.TemplateDocSyncClient])
  * so she can watch Paco's edits land in near real time without leaving the app - unlike
- * "Ver documento", which hands off to the full Google Docs editor.
+ * "Ver documento", which hands off to the full Google Docs editor. The paragraph list renders on
+ * a white "page" with the same Título/Subtítulo/Normal look plantilla-sync.gs enforces in the
+ * real Doc, so it reads like a quick look at the document rather than a plain text dump.
  */
 @Composable
 fun TemplateDocPreviewDialog(
-    paragraphs: List<String>,
+    paragraphs: List<TemplateParagraph>,
     isLoading: Boolean,
     errorMessage: String?,
     onDismiss: () -> Unit,
@@ -117,20 +128,61 @@ fun TemplateDocPreviewDialog(
                         }
                     }
                     else -> {
-                        LazyColumn(
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            items(paragraphs) { paragraph ->
-                                Text(
-                                    text = paragraph.ifBlank { stringResource(R.string.template_paragraph_empty) },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                            }
-                        }
+                        DocumentPage(paragraphs, modifier = Modifier.weight(1f).fillMaxWidth())
                     }
                 }
             }
         }
+    }
+}
+
+/** A white page, like Google Docs always shows regardless of the phone's own light/dark theme. */
+@Composable
+private fun DocumentPage(paragraphs: List<TemplateParagraph>, modifier: Modifier = Modifier) {
+    Surface(
+        color = Color.White,
+        contentColor = Color(0xFF202124),
+        shape = RoundedCornerShape(4.dp),
+        modifier = modifier.border(1.dp, Color(0xFFDADCE0), RoundedCornerShape(4.dp)),
+    ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            items(paragraphs) { paragraph ->
+                DocumentParagraph(paragraph)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DocumentParagraph(paragraph: TemplateParagraph) {
+    val text = paragraph.text.ifBlank { stringResource(R.string.template_paragraph_empty) }
+    when (paragraph.style) {
+        TemplateParagraphStyle.TITLE -> Text(
+            text = text.uppercase(),
+            fontFamily = FontFamily.SansSerif,
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        TemplateParagraphStyle.SUBTITLE -> Text(
+            text = text,
+            fontFamily = FontFamily.SansSerif,
+            fontWeight = FontWeight.Normal,
+            fontSize = 15.sp,
+            textAlign = TextAlign.Start,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        TemplateParagraphStyle.NORMAL -> Text(
+            text = text,
+            fontFamily = FontFamily.SansSerif,
+            fontWeight = FontWeight.Normal,
+            fontSize = 13.sp,
+            textAlign = TextAlign.Justify,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }

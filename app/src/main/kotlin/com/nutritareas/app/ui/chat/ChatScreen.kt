@@ -70,6 +70,7 @@ import com.nutritareas.app.ui.chat.components.ApiKeyMissingBanner
 import com.nutritareas.app.ui.chat.components.ApplyTemplateRow
 import com.nutritareas.app.ui.chat.components.ChatInputBar
 import com.nutritareas.app.ui.chat.components.DocumentReadyRow
+import com.nutritareas.app.ui.chat.components.EditingMessageRow
 import com.nutritareas.app.ui.chat.components.MessageBubble
 import com.nutritareas.app.ui.chat.components.NutritionBackdrop
 import com.nutritareas.app.ui.chat.components.PdfChip
@@ -203,6 +204,9 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                         onCancel = viewModel::onCancelPendingPdf,
                     )
                 }
+                if (uiState.isEditingMessage) {
+                    EditingMessageRow(onCancel = viewModel::onCancelEditing)
+                }
                 ChatInputBar(
                     text = uiState.inputText,
                     onTextChange = viewModel::onInputChange,
@@ -245,13 +249,20 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                     onRefresh = viewModel::onRefreshChat,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                 ) {
+                    val lastUserMessageId = uiState.messages.lastOrNull { it.role == ChatRole.USER }?.id
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        items(uiState.messages, key = { it.id }) { message -> MessageBubble(message) }
+                        items(uiState.messages, key = { it.id }) { message ->
+                            MessageBubble(
+                                message = message,
+                                isEditable = !uiState.isAssistantResponding && message.id == lastUserMessageId,
+                                onEditRequested = { viewModel.onEditLastMessageRequested(message.id) },
+                            )
+                        }
                         if (uiState.isAssistantResponding) {
                             item(key = "streaming") {
                                 if (uiState.streamingText.isEmpty()) {

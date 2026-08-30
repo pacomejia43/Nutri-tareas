@@ -3,9 +3,11 @@ package com.nutritareas.app.ui.chat.components
 import android.graphics.BitmapFactory
 import android.util.Base64
 import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,12 +20,20 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,12 +50,19 @@ import com.nutritareas.app.data.chat.ChatImageAttachment
 import com.nutritareas.app.data.chat.ChatMessage
 import com.nutritareas.app.data.chat.ChatRole
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MessageBubble(message: ChatMessage, modifier: Modifier = Modifier) {
+fun MessageBubble(
+    message: ChatMessage,
+    isEditable: Boolean = false,
+    onEditRequested: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
     val isUser = message.role == ChatRole.USER
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val copiedLabel = stringResource(R.string.message_copied)
+    var showEditMenu by remember { mutableStateOf(false) }
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -60,22 +77,41 @@ fun MessageBubble(message: ChatMessage, modifier: Modifier = Modifier) {
             isUser -> MaterialTheme.colorScheme.onPrimaryContainer
             else -> MaterialTheme.colorScheme.onSurfaceVariant
         }
-        Surface(
-            color = containerColor,
-            contentColor = contentColor,
-            shape = MaterialTheme.shapes.large,
-            modifier = Modifier.widthIn(max = 320.dp).clickable(enabled = message.text.isNotBlank()) {
-                clipboardManager.setText(AnnotatedString(message.text))
-                Toast.makeText(context, copiedLabel, Toast.LENGTH_SHORT).show()
-            },
-        ) {
-            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                if (message.imageAttachments.isNotEmpty()) {
-                    ImageAttachmentsRow(message.imageAttachments)
-                    if (message.text.isNotBlank()) Spacer(Modifier.height(8.dp))
+        Box {
+            Surface(
+                color = containerColor,
+                contentColor = contentColor,
+                shape = MaterialTheme.shapes.large,
+                modifier = Modifier.widthIn(max = 320.dp).combinedClickable(
+                    enabled = message.text.isNotBlank(),
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(message.text))
+                        Toast.makeText(context, copiedLabel, Toast.LENGTH_SHORT).show()
+                    },
+                    onLongClick = if (isEditable) {
+                        { showEditMenu = true }
+                    } else {
+                        null
+                    },
+                ),
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    if (message.imageAttachments.isNotEmpty()) {
+                        ImageAttachmentsRow(message.imageAttachments)
+                        if (message.text.isNotBlank()) Spacer(Modifier.height(8.dp))
+                    }
+                    if (message.text.isNotBlank()) {
+                        Text(text = message.text, style = MaterialTheme.typography.bodyLarge)
+                    }
                 }
-                if (message.text.isNotBlank()) {
-                    Text(text = message.text, style = MaterialTheme.typography.bodyLarge)
+            }
+            if (isEditable) {
+                DropdownMenu(expanded = showEditMenu, onDismissRequest = { showEditMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.edit_message)) },
+                        leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                        onClick = { showEditMenu = false; onEditRequested() },
+                    )
                 }
             }
         }

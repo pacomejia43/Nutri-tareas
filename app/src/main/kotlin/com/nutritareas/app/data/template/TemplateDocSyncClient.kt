@@ -15,10 +15,19 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 class TemplateSyncException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
+/** How a paragraph is formatted in the live Doc - mirrors the three looks `applyParagraphEdit_` in
+ *  plantilla-sync.gs already enforces, so the in-app preview can render the same way. */
+enum class TemplateParagraphStyle { TITLE, SUBTITLE, NORMAL }
+
+data class TemplateParagraph(val text: String, val style: TemplateParagraphStyle)
+
 @Serializable
 private data class TemplateSyncResponse(
     val ok: Boolean = true,
     val paragraphs: List<String> = emptyList(),
+    // Absent on a script deployment that predates this field - every paragraph then falls back to
+    // NORMAL in [toTemplateParagraphs], same plain look the preview always had.
+    val paragraphStyles: List<String> = emptyList(),
     val error: String? = null,
 )
 
@@ -45,7 +54,12 @@ class TemplateDocSyncClient {
 
     /** Fetches the live doc's paragraphs, in reading order, so the assistant can refer to one by index. */
     suspend fun fetchParagraphs(webAppUrl: String): List<String> = withContext(Dispatchers.IO) {
-        execute { Request.Builder().url(webAppUrl).get().build() }
+        execute { Request.Builder().url(webAppUrl).get().build() }.paragraphs
+    }
+
+    /** Fetches the live doc's paragraphs with their Título/Subtítulo/Normal styling, for the "Ver en vivo" preview. */
+    suspend fun fetchPreview(webAppUrl: String): List<TemplateParagraph> = withContext(Dispatchers.IO) {
+        toTemplateParagraphs(execute { Request.Builder().url(webAppUrl).get().build() })
     }
 
     /** Applies [edits] (paragraph index -> new full text) to the live doc and returns its resulting paragraphs. */
@@ -56,10 +70,10 @@ class TemplateDocSyncClient {
                 .url(webAppUrl)
                 .post(json.encodeToString(payload).toRequestBody(JSON_MEDIA_TYPE))
                 .build()
-        }
+        }.paragraphs
     }
 
-    private fun execute(buildRequest: () -> Request): List<String> {
+    private fun execute(buildRequest: () -> Request): TemplateSyncResponse {
         try {
             httpClient.newCall(buildRequest()).execute().use { response ->
                 if (!response.isSuccessful) throw TemplateSyncException("HTTP ${response.code}")
@@ -67,7 +81,7 @@ class TemplateDocSyncClient {
                 val parsed = runCatching { json.decodeFromString<TemplateSyncResponse>(bodyText) }
                     .getOrElse { throw TemplateSyncException("Respuesta inesperada del script.", it) }
                 if (!parsed.ok) throw TemplateSyncException(parsed.error ?: "Error desconocido del script.")
-                return parsed.paragraphs
+                return parsed
             }
         } catch (e: IOException) {
             throw TemplateSyncException("No hay conexión a internet.", e)
@@ -75,6 +89,16 @@ class TemplateDocSyncClient {
             throw TemplateSyncException("La URL de la plantilla no es válida.", e)
         }
     }
+
+    private fun toTemplateParagraphs(response: TemplateSyncResponse): List<TemplateParagraph> =
+        response.paragraphs.mapIndexed { index, text ->
+            val style = when (response.paragraphStyles.getOrNull(index)) {
+                "title" -> TemplateParagraphStyle.TITLE
+                "subtitle" -> TemplateParagraphStyle.SUBTITLE
+                else -> TemplateParagraphStyle.NORMAL
+            }
+            TemplateParagraph(text, style)
+        }
 
     private companion object {
         val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
