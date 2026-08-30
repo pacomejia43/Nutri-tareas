@@ -174,3 +174,25 @@ fun DocumentReadyRow(onSave: () -> Unit, onShare: () -> Unit, modifier: Modifier
         }
     }
 }
+
+@Composable
+fun ImageReadyRow(onSave: () -> Unit, onShare: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant, modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.image_ready),
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onSave) { Text(stringResource(R.string.save)) }
+            Button(onClick = onShare) {
+                Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
+                Text(stringResource(R.string.share_document))
+            }
+        }
+    }
+}

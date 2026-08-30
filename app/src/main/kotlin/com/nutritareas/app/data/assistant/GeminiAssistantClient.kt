@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -20,6 +21,9 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+
+/** A generated image (infographic, diagram, drawing...) - see [GeminiAssistantClient.generateImage]. */
+data class GeneratedImage(val base64: String, val mimeType: String)
 
 /**
  * Talks to Gemini via its plain REST API over OkHttp (no official Android SDK dependency needed:
@@ -103,6 +107,37 @@ class GeminiAssistantClient : AssistantClient {
         // could silently lose chunks partway through and render as truncated with no error at all.
         .buffer(Channel.UNLIMITED)
 
+    /**
+     * One-shot image generation (infographics, diagrams, drawings...) - not part of [AssistantClient]
+     * since Claude has no equivalent here; Paco asks for this via the `[[IMAGEN]]` marker (see
+     * [AssistantPersona.systemPrompt] and [parseImageRequest]) regardless of which provider is
+     * chatting, so this always runs on Gemini specifically with [IMAGE_MODEL_ID].
+     */
+    suspend fun generateImage(apiKey: String, modelId: String, prompt: String): GeneratedImage = withContext(Dispatchers.IO) {
+        try {
+            val requestBody = GeminiRequest(
+                contents = listOf(GeminiContent(role = "user", parts = listOf(GeminiPart(text = prompt)))),
+                generationConfig = GeminiGenerationConfig(responseModalities = listOf("TEXT", "IMAGE")),
+            )
+            val request = Request.Builder()
+                .url("$BASE_URL/models/$modelId:generateContent")
+                .header("x-goog-api-key", apiKey)
+                .post(json.encodeToString(requestBody).toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+            httpClient.newCall(request).execute().use { response ->
+                val bodyText = response.body?.string().orEmpty()
+                if (!response.isSuccessful) throw errorForStatus(response.code, bodyText)
+                val parts = runCatching { json.decodeFromString<GeminiStreamChunk>(bodyText) }.getOrNull()
+                    ?.candidates?.firstOrNull()?.content?.parts.orEmpty()
+                val imageData = parts.firstNotNullOfOrNull { it.inlineData }
+                    ?: throw AssistantError.Unknown(IOException("La respuesta no incluyó una imagen."))
+                GeneratedImage(base64 = imageData.data, mimeType = imageData.mimeType)
+            }
+        } catch (e: IOException) {
+            throw AssistantError.Network(e)
+        }
+    }
+
     /** Builds the request contents, placing the PDF/images on the same turn they were first sent on. */
     internal fun buildRequestBody(
         history: List<ChatMessage>,
@@ -180,6 +215,11 @@ class GeminiAssistantClient : AssistantClient {
     companion object {
         private const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+
+        /** Google's current Gemini image-generation model ("Nano Banana" family). Independent of
+         *  [com.nutritareas.app.data.settings.AppSettings.geminiModelId], which only picks the text
+         *  chat model - update this if Google renames or retires it. */
+        const val IMAGE_MODEL_ID = "gemini-2.5-flash-image"
 
         /** Extracts the payload from an SSE `data: {...}` line, or null for any other SSE line (comments, blanks, other fields). */
         internal fun sseDataPayload(line: String): String? {

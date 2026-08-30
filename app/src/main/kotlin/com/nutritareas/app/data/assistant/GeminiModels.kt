@@ -7,6 +7,13 @@ import kotlinx.serialization.Serializable
 data class GeminiRequest(
     val contents: List<GeminiContent>,
     val systemInstruction: GeminiContent? = null,
+    val generationConfig: GeminiGenerationConfig? = null,
+)
+
+/** Only used for image generation - asks the model to return an image part, not just text. */
+@Serializable
+data class GeminiGenerationConfig(
+    val responseModalities: List<String>? = null,
 )
 
 @Serializable

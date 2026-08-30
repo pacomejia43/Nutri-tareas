@@ -71,6 +71,7 @@ import com.nutritareas.app.ui.chat.components.ApplyTemplateRow
 import com.nutritareas.app.ui.chat.components.ChatInputBar
 import com.nutritareas.app.ui.chat.components.DocumentReadyRow
 import com.nutritareas.app.ui.chat.components.EditingMessageRow
+import com.nutritareas.app.ui.chat.components.ImageReadyRow
 import com.nutritareas.app.ui.chat.components.MessageBubble
 import com.nutritareas.app.ui.chat.components.NutritionBackdrop
 import com.nutritareas.app.ui.chat.components.PdfChip
@@ -107,6 +108,11 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         ActivityResultContracts.CreateDocument(DOCX_MIME_TYPE),
     ) { uri ->
         uri?.let(viewModel::writeDocumentTo)
+    }
+    val saveImageLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("image/png"),
+    ) { uri ->
+        uri?.let(viewModel::writeImageTo)
     }
 
     val itemCount = uiState.messages.size + if (uiState.isAssistantResponding) 1 else 0
@@ -194,6 +200,12 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                         onShare = { shareDocument(context, uri) },
                     )
                 }
+                uiState.readyImageUri?.let { uri ->
+                    ImageReadyRow(
+                        onSave = { saveImageLauncher.launch(uiState.readyImageFileName ?: "imagen.png") },
+                        onShare = { shareImage(context, uri) },
+                    )
+                }
                 if (uiState.canApplyTemplate) {
                     ApplyTemplateRow(isBuilding = uiState.isBuildingDocument, onClick = viewModel::onApplyTemplateClick)
                 }
@@ -232,7 +244,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 if (!uiState.hasApiKey) {
                     ApiKeyMissingBanner(onOpenSettings = onOpenSettings)
                 }
-                if (uiState.isLoadingPdf || uiState.isLoadingImages || uiState.isLoadingTemplate) {
+                if (uiState.isLoadingPdf || uiState.isLoadingImages || uiState.isLoadingTemplate || uiState.isGeneratingImage) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
                 if (uiState.hasPdf) {
@@ -295,6 +307,15 @@ private fun providerLabel(provider: AssistantProvider): String = when (provider)
 private fun shareDocument(context: Context, uri: Uri) {
     val sendIntent = Intent(Intent.ACTION_SEND).apply {
         type = DOCX_MIME_TYPE
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(sendIntent, context.getString(R.string.share_document)))
+}
+
+private fun shareImage(context: Context, uri: Uri) {
+    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "image/*"
         putExtra(Intent.EXTRA_STREAM, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }

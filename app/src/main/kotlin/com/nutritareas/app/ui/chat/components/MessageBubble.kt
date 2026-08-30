@@ -97,7 +97,19 @@ fun MessageBubble(
             ) {
                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                     if (message.imageAttachments.isNotEmpty()) {
-                        ImageAttachmentsRow(message.imageAttachments)
+                        // Paco only ever attaches images as a generated infographic/drawing on its
+                        // own message (see ChatViewModel.appendGeneratedImage) - shown large enough
+                        // to actually read, unlike her own attached photos' small preview strip.
+                        val isGenerated = !isUser
+                        ImageAttachmentsRow(
+                            attachments = message.imageAttachments,
+                            contentDescription = if (isUser) {
+                                stringResource(R.string.cd_attach_image)
+                            } else {
+                                stringResource(R.string.cd_generated_image)
+                            },
+                            isGenerated = isGenerated,
+                        )
                         if (message.text.isNotBlank()) Spacer(Modifier.height(8.dp))
                     }
                     if (message.text.isNotBlank()) {
@@ -119,16 +131,25 @@ fun MessageBubble(
 }
 
 @Composable
-private fun ImageAttachmentsRow(attachments: List<ChatImageAttachment>, modifier: Modifier = Modifier) {
+private fun ImageAttachmentsRow(
+    attachments: List<ChatImageAttachment>,
+    contentDescription: String,
+    isGenerated: Boolean,
+    modifier: Modifier = Modifier,
+) {
     LazyRow(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         items(attachments) { attachment ->
             val bitmap = remember(attachment.base64) { decodeThumbnail(attachment.base64) }
             if (bitmap != null) {
                 Image(
                     bitmap = bitmap,
-                    contentDescription = stringResource(R.string.cd_attach_image),
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(96.dp).clip(RoundedCornerShape(10.dp)),
+                    contentDescription = contentDescription,
+                    contentScale = if (isGenerated) ContentScale.FillWidth else ContentScale.Crop,
+                    modifier = if (isGenerated) {
+                        Modifier.width(260.dp).clip(RoundedCornerShape(10.dp))
+                    } else {
+                        Modifier.size(96.dp).clip(RoundedCornerShape(10.dp))
+                    },
                 )
             }
         }

@@ -37,6 +37,8 @@
     <string name="new_conversation_confirm_body">Se borrará la conversación actual en este dispositivo. El documento que ya generaste y guardaste no se verá afectado.</string>
     <string name="edit_message">Editar</string>
     <string name="editing_message_banner">Editando tu último mensaje</string>
+    <string name="image_ready">Imagen generada</string>
+    <string name="image_generating_caption">Aquí tienes:</string>
 
     <!-- Errors -->
     <string name="error_generic">Ocurrió un error. Inténtalo de nuevo.</string>
@@ -51,6 +53,7 @@
     <string name="error_network">No hay conexión a internet. Revisa tu conexión e inténtalo de nuevo.</string>
     <string name="error_invalid_api_key">Tu clave de API no es válida o fue revocada. Revísala en Ajustes.</string>
     <string name="error_rate_limited">Se alcanzó el límite de uso de la API. Espera un momento e inténtalo de nuevo.</string>
+    <string name="error_no_gemini_key_for_image">Para generar imágenes necesito tu clave de Gemini. Configúrala en Ajustes, aunque estés conversando con Claude.</string>
 
     <!-- Settings -->
     <string name="settings_title">Ajustes</string>
@@ -108,6 +111,7 @@
     <string name="cd_attach_menu">Adjuntar archivo</string>
     <string name="cd_attach_pdf">Adjuntar PDF</string>
     <string name="cd_attach_image">Adjuntar captura o foto</string>
+    <string name="cd_generated_image">Imagen generada por Paco</string>
     <string name="cd_attach_template">Adjuntar plantilla de Word</string>
     <string name="cd_cancel_pdf_attachment">Quitar PDF adjunto</string>
     <string name="cd_send">Enviar mensaje</string>

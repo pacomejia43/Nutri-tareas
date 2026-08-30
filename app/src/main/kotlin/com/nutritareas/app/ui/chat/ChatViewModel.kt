@@ -15,6 +15,9 @@ import com.nutritareas.app.data.assistant.AssistantClient
 import com.nutritareas.app.data.assistant.AssistantError
 import com.nutritareas.app.data.assistant.AssistantPersona
 import com.nutritareas.app.data.assistant.AssistantStreamEvent
+import com.nutritareas.app.data.assistant.GeminiAssistantClient
+import com.nutritareas.app.data.assistant.GeneratedImage
+import com.nutritareas.app.data.assistant.parseImageRequest
 import com.nutritareas.app.data.chat.ChatHistoryStore
 import com.nutritareas.app.data.chat.ChatImageAttachment
 import com.nutritareas.app.data.chat.ChatMessage
@@ -57,7 +60,7 @@ class ChatViewModel(
     private val docxTemplateReader: DocxTemplateReader,
     private val templateDocSyncClient: TemplateDocSyncClient,
     private val claudeAssistantClient: AssistantClient,
-    private val geminiAssistantClient: AssistantClient,
+    private val geminiAssistantClient: GeminiAssistantClient,
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -66,6 +69,7 @@ class ChatViewModel(
     private var session: ChatSession = ChatSession()
     private var currentSettings: AppSettings = AppSettings()
     private var readyDocumentFile: File? = null
+    private var readyImageFile: File? = null
     private var pendingPdfContent: PdfContent? = null
     private var templatePreviewJob: Job? = null
 
@@ -353,6 +357,7 @@ class ChatViewModel(
 
     fun onConfirmNewConversation() {
         readyDocumentFile = null
+        readyImageFile = null
         pendingPdfContent = null
         templatePreviewJob?.cancel()
         templatePreviewJob = null
@@ -492,9 +497,17 @@ class ChatViewModel(
                 }
 
                 is AssistantStreamEvent.Completed -> {
-                    appendAssistantMessage(event.fullText, isError = false)
-                    if (isTemplateApplication) applyTemplateEdits(event.fullText)
-                    if (isGoogleDocSync) applyGoogleDocEdits(event.fullText)
+                    val imageRequest = parseImageRequest(event.fullText)
+                    if (imageRequest != null) {
+                        val app = getApplication<Application>()
+                        val caption = imageRequest.visibleText.ifBlank { app.getString(R.string.image_generating_caption) }
+                        appendAssistantMessage(caption, isError = false)
+                        generateImage(imageRequest.prompt)
+                    } else {
+                        appendAssistantMessage(event.fullText, isError = false)
+                        if (isTemplateApplication) applyTemplateEdits(event.fullText)
+                        if (isGoogleDocSync) applyGoogleDocEdits(event.fullText)
+                    }
                 }
 
                 is AssistantStreamEvent.Failed -> {
@@ -517,6 +530,75 @@ class ChatViewModel(
     private fun assistantClientForActiveProvider(): AssistantClient = when (currentSettings.activeProvider) {
         AssistantProvider.CLAUDE -> claudeAssistantClient
         AssistantProvider.GEMINI -> geminiAssistantClient
+    }
+
+    /**
+     * Image generation always runs on Gemini specifically - via [geminiAssistantClient], regardless
+     * of [AppSettings.activeProvider] - since Claude has no equivalent integrated here. Needs her
+     * Gemini key configured even if she's chatting with Claude.
+     */
+    private fun generateImage(prompt: String) {
+        val app = getApplication<Application>()
+        val geminiKey = currentSettings.geminiApiKey
+        if (geminiKey.isNullOrBlank()) {
+            appendAssistantMessage(app.getString(R.string.error_no_gemini_key_for_image), isError = true)
+            return
+        }
+        _uiState.update { it.copy(isGeneratingImage = true) }
+        viewModelScope.launch {
+            try {
+                val image = geminiAssistantClient.generateImage(geminiKey, GeminiAssistantClient.IMAGE_MODEL_ID, prompt)
+                appendGeneratedImage(image)
+            } catch (e: AssistantError) {
+                appendAssistantMessage(errorText(e), isError = true)
+            }
+            _uiState.update { it.copy(isGeneratingImage = false) }
+        }
+    }
+
+    private fun appendGeneratedImage(image: GeneratedImage) {
+        val app = getApplication<Application>()
+        val message = ChatMessage(
+            id = UUID.randomUUID().toString(),
+            role = ChatRole.ASSISTANT,
+            text = "",
+            timestampEpochMillis = System.currentTimeMillis(),
+            imageAttachments = listOf(ChatImageAttachment(base64 = image.base64, mimeType = image.mimeType)),
+        )
+        session = session.copy(messages = session.messages + message)
+        persistSession()
+        _uiState.update { it.copy(messages = session.messages) }
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val bytes = Base64.decode(image.base64, Base64.NO_WRAP)
+                val extension = if (image.mimeType == "image/jpeg") "jpg" else "png"
+                val dir = File(app.cacheDir, "imagenes").apply { mkdirs() }
+                val fileName = "imagen_${System.currentTimeMillis()}.$extension"
+                val file = File(dir, fileName)
+                file.writeBytes(bytes)
+                readyImageFile = file
+                val uri = FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", file)
+                _uiState.update { it.copy(readyImageUri = uri, readyImageFileName = fileName) }
+            } catch (e: Exception) {
+                // The image is already visible in chat either way - just no Guardar/Compartir row for it.
+            }
+        }
+    }
+
+    /** Copies the last generated image to [destinationUri] (from a CreateDocument picker result). */
+    fun writeImageTo(destinationUri: Uri) {
+        val sourceFile = readyImageFile ?: return
+        val app = getApplication<Application>()
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                app.contentResolver.openOutputStream(destinationUri)?.use { out ->
+                    sourceFile.inputStream().use { input -> input.copyTo(out) }
+                } ?: throw IllegalStateException("No se pudo abrir el destino.")
+                _uiState.update { it.copy(infoMessage = app.getString(R.string.image_ready)) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = app.getString(R.string.error_generic)) }
+            }
+        }
     }
 
     private fun appendAssistantMessage(text: String, isError: Boolean) {

@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Generated .docx files, shared with the user via ACTION_SEND.
+    <!-- Generated .docx files and Paco's generated images, shared with the user via ACTION_SEND.
          Downloaded update APKs are not listed here: DownloadManager vends its own
          content:// Uri for those via getUriForDownloadedFile(). -->
     <cache-path name="documentos" path="documentos/" />
+    <cache-path name="imagenes" path="imagenes/" />
 </paths>
