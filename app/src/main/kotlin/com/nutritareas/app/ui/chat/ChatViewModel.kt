@@ -119,7 +119,8 @@ class ChatViewModel(
                 session = session.copy(
                     pdfFileName = content.fileName,
                     pdfPageCount = content.pageCount,
-                    pdfBase64 = content.base64,
+                    pdfBase64 = if (content.markdown == null) content.base64 else null,
+                    pdfMarkdown = content.markdown,
                 )
                 persistSession()
                 _uiState.update {
@@ -301,6 +302,7 @@ class ChatViewModel(
                 history = historyForRequest,
                 pdfBase64 = session.pdfBase64,
                 pdfFileName = session.pdfFileName,
+                pdfMarkdown = session.pdfMarkdown,
                 newUserText = userText,
                 newUserImages = images,
             ).collect { event ->

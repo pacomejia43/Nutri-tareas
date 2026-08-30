@@ -42,6 +42,7 @@ class ClaudeAssistantClient : AssistantClient {
         history: List<ChatMessage>,
         pdfBase64: String?,
         pdfFileName: String?,
+        pdfMarkdown: String?,
         newUserText: String,
         newUserImages: List<ChatImageAttachment>,
     ): Flow<AssistantStreamEvent> = callbackFlow {
@@ -50,7 +51,7 @@ class ClaudeAssistantClient : AssistantClient {
         val job = launch(Dispatchers.IO) {
             val textBuilder = StringBuilder()
             try {
-                val params = buildParams(modelId, history, pdfBase64, pdfFileName, newUserText, newUserImages)
+                val params = buildParams(modelId, history, pdfBase64, pdfFileName, pdfMarkdown, newUserText, newUserImages)
                 client.messages().createStreaming(params).use { streamResponse ->
                     streamResponse.stream().forEach { event ->
                         event.contentBlockDelta().ifPresent { delta ->
@@ -91,6 +92,7 @@ class ClaudeAssistantClient : AssistantClient {
         history: List<ChatMessage>,
         pdfBase64: String?,
         pdfFileName: String?,
+        pdfMarkdown: String?,
         newUserText: String,
         newUserImages: List<ChatImageAttachment>,
     ): MessageCreateParams {
@@ -103,7 +105,7 @@ class ClaudeAssistantClient : AssistantClient {
 
         var pdfAttached = false
         for (message in history) {
-            val attachPdfHere = !pdfAttached && message.role == ChatRole.USER && pdfBase64 != null
+            val attachPdfHere = !pdfAttached && message.role == ChatRole.USER && (pdfBase64 != null || pdfMarkdown != null)
             if (attachPdfHere) pdfAttached = true
             builder.addMessage(
                 toMessageParam(
@@ -112,11 +114,12 @@ class ClaudeAssistantClient : AssistantClient {
                     images = message.imageAttachments,
                     pdfBase64 = if (attachPdfHere) pdfBase64 else null,
                     pdfFileName = pdfFileName,
+                    pdfMarkdown = if (attachPdfHere) pdfMarkdown else null,
                 ),
             )
         }
 
-        val attachPdfOnNewTurn = !pdfAttached && pdfBase64 != null
+        val attachPdfOnNewTurn = !pdfAttached && (pdfBase64 != null || pdfMarkdown != null)
         builder.addMessage(
             toMessageParam(
                 role = ChatRole.USER,
@@ -124,6 +127,7 @@ class ClaudeAssistantClient : AssistantClient {
                 images = newUserImages,
                 pdfBase64 = if (attachPdfOnNewTurn) pdfBase64 else null,
                 pdfFileName = pdfFileName,
+                pdfMarkdown = if (attachPdfOnNewTurn) pdfMarkdown else null,
             ),
         )
 
@@ -137,13 +141,16 @@ class ClaudeAssistantClient : AssistantClient {
         images: List<ChatImageAttachment>,
         pdfBase64: String?,
         pdfFileName: String?,
+        pdfMarkdown: String?,
     ): MessageParam {
         val sdkRole = if (role == ChatRole.USER) MessageParam.Role.USER else MessageParam.Role.ASSISTANT
-        if (pdfBase64 == null && images.isEmpty()) {
+        if (pdfBase64 == null && pdfMarkdown == null && images.isEmpty()) {
             return MessageParam.builder().role(sdkRole).content(text).build()
         }
         val blocks = mutableListOf<ContentBlockParam>()
-        if (pdfBase64 != null) {
+        if (pdfMarkdown != null) {
+            blocks += ContentBlockParam.ofText(TextBlockParam.builder().text(pdfMarkdown).build())
+        } else if (pdfBase64 != null) {
             val document = DocumentBlockParam.builder()
                 .source(Base64PdfSource.builder().data(pdfBase64).build())
                 .title(pdfFileName ?: "documento.pdf")

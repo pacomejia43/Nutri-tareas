@@ -29,6 +29,7 @@ data class ChatSession(
     val pdfFileName: String? = null,
     val pdfPageCount: Int = 0,
     val pdfBase64: String? = null,
+    val pdfMarkdown: String? = null,
     val templateFileName: String? = null,
     val templateParagraphs: List<String> = emptyList(),
     val templateEntriesBase64: Map<String, String> = emptyMap(),

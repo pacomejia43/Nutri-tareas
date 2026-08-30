@@ -44,6 +44,7 @@ class GeminiAssistantClient : AssistantClient {
         history: List<ChatMessage>,
         pdfBase64: String?,
         pdfFileName: String?,
+        pdfMarkdown: String?,
         newUserText: String,
         newUserImages: List<ChatImageAttachment>,
     ): Flow<AssistantStreamEvent> = callbackFlow {
@@ -52,7 +53,7 @@ class GeminiAssistantClient : AssistantClient {
         val job = launch(Dispatchers.IO) {
             val textBuilder = StringBuilder()
             try {
-                val requestBody = buildRequestBody(history, pdfBase64, newUserText, newUserImages)
+                val requestBody = buildRequestBody(history, pdfBase64, pdfMarkdown, newUserText, newUserImages)
                 val request = Request.Builder()
                     .url("$BASE_URL/models/$modelId:streamGenerateContent?alt=sse")
                     .header("x-goog-api-key", apiKey)
@@ -98,28 +99,31 @@ class GeminiAssistantClient : AssistantClient {
     internal fun buildRequestBody(
         history: List<ChatMessage>,
         pdfBase64: String?,
+        pdfMarkdown: String? = null,
         newUserText: String,
         newUserImages: List<ChatImageAttachment>,
     ): GeminiRequest {
         val contents = mutableListOf<GeminiContent>()
         var pdfAttached = false
         for (message in history) {
-            val attachPdfHere = !pdfAttached && message.role == ChatRole.USER && pdfBase64 != null
+            val attachPdfHere = !pdfAttached && message.role == ChatRole.USER && (pdfBase64 != null || pdfMarkdown != null)
             if (attachPdfHere) pdfAttached = true
             contents += toGeminiContent(
                 role = message.role,
                 text = message.text,
                 images = message.imageAttachments,
                 pdfBase64 = if (attachPdfHere) pdfBase64 else null,
+                pdfMarkdown = if (attachPdfHere) pdfMarkdown else null,
             )
         }
 
-        val attachPdfOnNewTurn = !pdfAttached && pdfBase64 != null
+        val attachPdfOnNewTurn = !pdfAttached && (pdfBase64 != null || pdfMarkdown != null)
         contents += toGeminiContent(
             role = ChatRole.USER,
             text = newUserText,
             images = newUserImages,
             pdfBase64 = if (attachPdfOnNewTurn) pdfBase64 else null,
+            pdfMarkdown = if (attachPdfOnNewTurn) pdfMarkdown else null,
         )
 
         return GeminiRequest(
@@ -133,9 +137,12 @@ class GeminiAssistantClient : AssistantClient {
         text: String,
         images: List<ChatImageAttachment>,
         pdfBase64: String?,
+        pdfMarkdown: String?,
     ): GeminiContent {
         val parts = mutableListOf<GeminiPart>()
-        if (pdfBase64 != null) {
+        if (pdfMarkdown != null) {
+            parts += GeminiPart(text = pdfMarkdown)
+        } else if (pdfBase64 != null) {
             parts += GeminiPart(inlineData = GeminiInlineData(mimeType = "application/pdf", data = pdfBase64))
         }
         for (image in images) {

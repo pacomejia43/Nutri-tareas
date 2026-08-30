@@ -13,7 +13,9 @@ sealed interface AssistantStreamEvent {
 /**
  * Talks to one AI backend (Claude, Gemini...) for a single conversation turn. Every backend here
  * is stateless per request, so every call resends the full [history]; the PDF (if any) and any
- * images already sent are re-attached on whichever historical turn first carried them.
+ * images already sent are re-attached on whichever historical turn first carried them. A PDF is
+ * carried as [pdfMarkdown] (plain text) when it has a text layer, or as [pdfBase64] (a native
+ * document) when it doesn't - the two are mutually exclusive per session.
  */
 interface AssistantClient {
     fun streamTurn(
@@ -22,6 +24,7 @@ interface AssistantClient {
         history: List<ChatMessage>,
         pdfBase64: String?,
         pdfFileName: String?,
+        pdfMarkdown: String? = null,
         newUserText: String,
         newUserImages: List<ChatImageAttachment> = emptyList(),
     ): Flow<AssistantStreamEvent>
