@@ -40,6 +40,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -226,26 +227,32 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                         paragraphCount = uiState.templateParagraphCount,
                     )
                 }
-                LazyColumn(
-                    state = listState,
+                PullToRefreshBox(
+                    isRefreshing = false,
+                    onRefresh = viewModel::onRefreshChat,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
-                    contentPadding = PaddingValues(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(uiState.messages, key = { it.id }) { message -> MessageBubble(message) }
-                    if (uiState.isAssistantResponding) {
-                        item(key = "streaming") {
-                            if (uiState.streamingText.isEmpty()) {
-                                TypingIndicatorBubble()
-                            } else {
-                                MessageBubble(
-                                    ChatMessage(
-                                        id = "streaming",
-                                        role = ChatRole.ASSISTANT,
-                                        text = uiState.streamingText,
-                                        timestampEpochMillis = 0L,
-                                    ),
-                                )
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(uiState.messages, key = { it.id }) { message -> MessageBubble(message) }
+                        if (uiState.isAssistantResponding) {
+                            item(key = "streaming") {
+                                if (uiState.streamingText.isEmpty()) {
+                                    TypingIndicatorBubble()
+                                } else {
+                                    MessageBubble(
+                                        ChatMessage(
+                                            id = "streaming",
+                                            role = ChatRole.ASSISTANT,
+                                            text = uiState.streamingText,
+                                            timestampEpochMillis = 0L,
+                                        ),
+                                    )
+                                }
                             }
                         }
                     }

@@ -2,7 +2,9 @@ package com.nutritareas.app.ui.chat.components
 
 import android.graphics.BitmapFactory
 import android.util.Base64
+import android.widget.Toast
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,7 +30,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.nutritareas.app.R
 import com.nutritareas.app.data.chat.ChatImageAttachment
@@ -38,6 +43,9 @@ import com.nutritareas.app.data.chat.ChatRole
 @Composable
 fun MessageBubble(message: ChatMessage, modifier: Modifier = Modifier) {
     val isUser = message.role == ChatRole.USER
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+    val copiedLabel = stringResource(R.string.message_copied)
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -56,7 +64,10 @@ fun MessageBubble(message: ChatMessage, modifier: Modifier = Modifier) {
             color = containerColor,
             contentColor = contentColor,
             shape = MaterialTheme.shapes.large,
-            modifier = Modifier.widthIn(max = 320.dp),
+            modifier = Modifier.widthIn(max = 320.dp).clickable(enabled = message.text.isNotBlank()) {
+                clipboardManager.setText(AnnotatedString(message.text))
+                Toast.makeText(context, copiedLabel, Toast.LENGTH_SHORT).show()
+            },
         ) {
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                 if (message.imageAttachments.isNotEmpty()) {

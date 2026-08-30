@@ -23,8 +23,10 @@ import com.nutritareas.app.data.chat.ChatMessage
 import com.nutritareas.app.data.chat.ChatRole
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 
@@ -86,6 +88,11 @@ class ClaudeAssistantClient : AssistantClient {
         }
         awaitClose { job.cancel() }
     }
+        // trySend() above doesn't suspend - on a full channel it just drops the element. Text
+        // deltas can arrive faster than the UI consumes them (a slow recomposition, a busy main
+        // thread), and callbackFlow's default buffer is only 64, so without this a long response
+        // could silently lose chunks partway through and render as truncated with no error at all.
+        .buffer(Channel.UNLIMITED)
 
     private fun buildParams(
         modelId: String,

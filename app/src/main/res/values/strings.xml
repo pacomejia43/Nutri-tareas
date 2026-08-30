@@ -14,6 +14,7 @@
     <string name="document_ready">Documento generado</string>
     <string name="save_document">Guardar</string>
     <string name="share_document">Compartir</string>
+    <string name="message_copied">Mensaje copiado</string>
     <string name="pdf_loaded_message">PDF cargado: %1$s (%2$d páginas)</string>
     <string name="pdf_pending_message">%1$s (%2$d páginas) listo para enviar. Escribe algo de contexto o toca enviar.</string>
     <string name="pdf_attach_intro">He adjuntado %1$s. Léelo y dime si necesitas algo de mí antes de empezar a desarrollar las tareas.</string>

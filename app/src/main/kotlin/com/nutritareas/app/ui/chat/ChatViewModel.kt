@@ -283,6 +283,18 @@ class ChatViewModel(
         _uiState.update { it.copy(infoMessage = null) }
     }
 
+    /**
+     * Pull-to-refresh on the chat list: clears a stuck error bubble (e.g. "no hay conexión") left
+     * over from a failed turn, without touching the rest of the conversation. A no-op otherwise.
+     */
+    fun onRefreshChat() {
+        val lastMessage = session.messages.lastOrNull() ?: return
+        if (!lastMessage.isError) return
+        session = session.copy(messages = session.messages.dropLast(1))
+        persistSession()
+        _uiState.update { it.copy(messages = session.messages) }
+    }
+
     /** Copies the last generated document to [destinationUri] (from a CreateDocument picker result). */
     fun writeDocumentTo(destinationUri: Uri) {
         val sourceFile = readyDocumentFile ?: return
