@@ -1,4 +1,4 @@
-import java.util.Base64
+import kotlin.random.Random
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -28,36 +28,46 @@ android {
     }
 
     signingConfigs {
-        // Every release build (local or CI) signs with the same key so that installing a newer
-        // APK over an older one works as an update instead of failing with a signature mismatch.
-        // This repo ships a committed, non-secret convenience keystore for that purpose (see
-        // release-signing/README.md); set the RELEASE_KEYSTORE_* env vars to override it with a
-        // real one without changing this file. The keystore itself is binary, so it's committed
-        // as a base64 text file and decoded here on first use (git diffs/hosts text more safely).
+        // Every release build signs with the same key so that installing a newer APK over an
+        // older one works as an update instead of failing with a signature mismatch. The real key
+        // lives only as RELEASE_KEYSTORE_* GitHub Actions secrets (see release-signing/README.md)
+        // - nothing secret is committed to this repo. Without those secrets (i.e. any local build),
+        // this falls back to a throwaway keystore generated once per checkout, gitignored, so
+        // `assembleRelease` still works for local testing; its signature won't match an official
+        // release, which only matters if you're trying to install a local build over one from CI.
         create("release") {
-            // GitHub Actions substitutes an unset secret as an empty string, not null - so an
-            // env-var lookup must treat blank the same as absent, not just null, or an unset
-            // secret would silently override every one of these with "".
-            fun envOrDefault(name: String, default: String): String =
-                System.getenv(name)?.takeIf { it.isNotBlank() } ?: default
-
             val explicitPath = System.getenv("RELEASE_KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
-            val keystoreFile = if (explicitPath != null) {
-                file(explicitPath)
+            if (explicitPath != null) {
+                storeFile = file(explicitPath)
+                storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+                keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
             } else {
-                val decoded = file("${rootProject.projectDir}/release-signing/nutri-tareas-release.keystore")
-                if (!decoded.exists()) {
-                    val encoded = file("${rootProject.projectDir}/release-signing/nutri-tareas-release.keystore.base64")
-                    if (encoded.exists()) {
-                        decoded.writeBytes(Base64.getDecoder().decode(encoded.readText().trim()))
-                    }
+                val localDir = file("${rootProject.projectDir}/release-signing/local")
+                val localKeystore = file("$localDir/local-release.keystore")
+                val localPasswordFile = file("$localDir/local-release.password")
+                if (!localKeystore.exists()) {
+                    localDir.mkdirs()
+                    val password = Random.nextBytes(24).joinToString("") { "%02x".format(it) }
+                    localPasswordFile.writeText(password)
+                    val javaHome = System.getProperty("java.home")
+                    val keytoolExe = if (org.gradle.internal.os.OperatingSystem.current().isWindows) "keytool.exe" else "keytool"
+                    val keytool = file("$javaHome/bin/$keytoolExe").takeIf { it.exists() }?.absolutePath ?: "keytool"
+                    val exitCode = ProcessBuilder(
+                        keytool, "-genkeypair",
+                        "-keystore", localKeystore.absolutePath,
+                        "-alias", "local",
+                        "-keyalg", "RSA", "-keysize", "2048", "-validity", "10000",
+                        "-storepass", password, "-keypass", password,
+                        "-dname", "CN=Local Dev, OU=Nutri-Tareas, O=Nutri-Tareas, L=NA, S=NA, C=MX",
+                    ).redirectErrorStream(true).start().waitFor()
+                    check(exitCode == 0) { "keytool failed generating the local dev keystore (exit $exitCode)." }
                 }
-                decoded
+                storeFile = localKeystore
+                storePassword = localPasswordFile.readText().trim()
+                keyAlias = "local"
+                keyPassword = localPasswordFile.readText().trim()
             }
-            storeFile = keystoreFile
-            storePassword = envOrDefault("RELEASE_KEYSTORE_PASSWORD", "nutritareas-update-key")
-            keyAlias = envOrDefault("RELEASE_KEY_ALIAS", "nutritareas")
-            keyPassword = envOrDefault("RELEASE_KEY_PASSWORD", "nutritareas-update-key")
         }
     }
 

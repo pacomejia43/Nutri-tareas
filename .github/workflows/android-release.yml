@@ -58,9 +58,15 @@ jobs:
       - name: Unit tests
         run: ./gradlew testReleaseUnitTest --stacktrace
 
+      - name: Decode release keystore
+        # The keystore itself can't be a secret's value directly (secrets hold text/short data,
+        # and Gradle needs an actual file) - RELEASE_KEYSTORE_BASE64 holds its base64, decoded
+        # here into a runner-local file that only this job ever sees.
+        run: echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.keystore"
+
       - name: Build signed release APK
         env:
-          RELEASE_KEYSTORE_PATH: ${{ secrets.RELEASE_KEYSTORE_PATH }}
+          RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
