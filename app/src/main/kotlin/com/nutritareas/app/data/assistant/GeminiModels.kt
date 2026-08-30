@@ -37,3 +37,14 @@ data class GeminiCandidate(
     val content: GeminiContent? = null,
     val finishReason: String? = null,
 )
+
+/** Shape of a non-2xx response body, e.g. `{"error": {"code": 429, "message": "...", "status": "RESOURCE_EXHAUSTED"}}`. */
+@Serializable
+data class GeminiErrorResponse(val error: GeminiErrorDetail? = null)
+
+@Serializable
+data class GeminiErrorDetail(
+    val code: Int? = null,
+    val message: String? = null,
+    val status: String? = null,
+)

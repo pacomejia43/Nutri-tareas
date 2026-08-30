@@ -464,7 +464,13 @@ class ChatViewModel(
             is AssistantError.ModelNotFound,
             is AssistantError.ServerError,
             is AssistantError.Unknown,
-            -> app.getString(R.string.error_generic)
+            -> {
+                // These three otherwise collapse into one opaque "try again", which is exactly
+                // what hid a real cause (a Gemini model tier/quota rejection) behind a useless
+                // generic message. Appending the underlying cause makes that diagnosable in-chat.
+                val detail = error.cause?.message?.takeIf { it.isNotBlank() }
+                if (detail != null) app.getString(R.string.error_generic_detailed, detail) else app.getString(R.string.error_generic)
+            }
         }
     }
 

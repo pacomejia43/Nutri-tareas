@@ -66,7 +66,8 @@ class GeminiAssistantClient : AssistantClient {
                 activeCall = call
                 call.execute().use { response ->
                     if (!response.isSuccessful) {
-                        trySend(AssistantStreamEvent.Failed(errorForStatus(response.code)))
+                        val bodyText = response.body?.string().orEmpty()
+                        trySend(AssistantStreamEvent.Failed(errorForStatus(response.code, bodyText)))
                         return@use
                     }
                     val source = response.body?.source() ?: throw IOException("Respuesta vacía.")
@@ -159,12 +160,21 @@ class GeminiAssistantClient : AssistantClient {
         return GeminiContent(role = if (role == ChatRole.USER) "user" else "model", parts = parts)
     }
 
-    private fun errorForStatus(code: Int): AssistantError = when (code) {
-        401, 403 -> AssistantError.InvalidApiKey(IOException("HTTP $code"))
-        404 -> AssistantError.ModelNotFound(IOException("HTTP $code"))
-        429 -> AssistantError.RateLimited(IOException("HTTP $code"))
-        in 500..599 -> AssistantError.ServerError(IOException("HTTP $code"))
-        else -> AssistantError.Unknown(IOException("HTTP $code"))
+    /** [bodyText] is Google's own error JSON, if any - its message (e.g. "quota exceeded for
+     *  gemini-pro-latest") is far more actionable than the bare status code, so it's kept as the
+     *  cause's message instead of being discarded. */
+    private fun errorForStatus(code: Int, bodyText: String): AssistantError {
+        val detail = runCatching { json.decodeFromString<GeminiErrorResponse>(bodyText).error?.message }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() }
+        val cause = IOException(if (detail != null) "HTTP $code: $detail" else "HTTP $code")
+        return when (code) {
+            401, 403 -> AssistantError.InvalidApiKey(cause)
+            404 -> AssistantError.ModelNotFound(cause)
+            429 -> AssistantError.RateLimited(cause)
+            in 500..599 -> AssistantError.ServerError(cause)
+            else -> AssistantError.Unknown(cause)
+        }
     }
 
     companion object {

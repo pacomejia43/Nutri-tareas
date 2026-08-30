@@ -34,6 +34,7 @@
 
     <!-- Errors -->
     <string name="error_generic">Ocurrió un error. Inténtalo de nuevo.</string>
+    <string name="error_generic_detailed">Ocurrió un error. Inténtalo de nuevo.\n\nDetalle técnico: %1$s</string>
     <string name="error_no_api_key">Primero configura una clave de API en Ajustes.</string>
     <string name="error_pdf_read">No se pudo leer ese PDF. Intenta con otro archivo.</string>
     <string name="error_image_read">No se pudo leer esa imagen. Intenta con otra.</string>
