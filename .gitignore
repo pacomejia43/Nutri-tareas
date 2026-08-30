@@ -19,3 +19,7 @@ local.properties
 # The real release key lives only as GitHub Actions secrets now (see release-signing/README.md).
 # This holds a throwaway keystore build.gradle.kts generates once per checkout for local builds.
 /release-signing/local/
+
+# Safety net: never let an actual keystore land in the repo, wherever it ends up.
+*.keystore
+*.keystore.base64

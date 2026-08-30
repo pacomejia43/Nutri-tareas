@@ -60,11 +60,15 @@ class UpdateInstaller(private val context: Context) {
                 if (continuation.isActive) continuation.resume(result)
             }
         }
+        // DownloadManager is a system service running outside this app's process, so this
+        // broadcast is sent from a different UID - RECEIVER_NOT_EXPORTED would silently drop it
+        // (that flag only allows broadcasts from this app's own package), leaving the download
+        // stuck at "Downloading" forever even though it finished.
         ContextCompat.registerReceiver(
             context,
             receiver,
             IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-            ContextCompat.RECEIVER_NOT_EXPORTED,
+            ContextCompat.RECEIVER_EXPORTED,
         )
         continuation.invokeOnCancellation {
             runCatching { context.unregisterReceiver(receiver) }
