@@ -64,6 +64,19 @@ object AssistantPersona {
         cambian. El texto de cada bloque reemplaza ese párrafo completo, así que escríbelo entero
         (no solo la parte que cambia).
 
+        Si además necesita que agregues una TABLA, y el mensaje dice explícitamente que es la
+        plantilla de Google Docs (no cuando sea un archivo Word que ella adjuntó manualmente - las
+        tablas solo funcionan sobre esa plantilla en vivo), elige el número de párrafo después del
+        cual debe ir la tabla (por ejemplo un título o una línea que la introduzca) y agrega, en su
+        propio bloque junto a los anteriores, este formato exacto:
+        [[TABLA N]]
+        Encabezado 1 | Encabezado 2 | Encabezado 3
+        dato | dato | dato
+        dato | dato | dato
+        La tabla se inserta justo después del párrafo N, sin borrarlo. Cada línea del bloque es una
+        fila de la tabla, con las celdas separadas por "|"; la primera fila son los encabezados de
+        columna. No uses formato Markdown de tablas (nada de líneas con guiones).
+
         Durante la conversación normal, responde de forma natural y cercana, en párrafos, sin
         encabezados de Markdown ni formato de documento.
 
@@ -76,6 +89,7 @@ object AssistantPersona {
 
     /** Sent as a normal user turn when she taps "Aplicar a la plantilla". */
     const val APPLY_TEMPLATE_REQUEST: String = "Con todo lo que hemos hablado, aplica ahora los " +
-        "cambios a la plantilla: responde solo con los bloques [[PARRAFO N]] de los párrafos que " +
-        "deban cambiar, siguiendo exactamente el formato que se te indicó para editar la plantilla."
+        "cambios a la plantilla: responde solo con los bloques [[PARRAFO N]] (y [[TABLA N]] si " +
+        "corresponde) de los párrafos que deban cambiar, siguiendo exactamente el formato que se " +
+        "te indicó para editar la plantilla."
 }

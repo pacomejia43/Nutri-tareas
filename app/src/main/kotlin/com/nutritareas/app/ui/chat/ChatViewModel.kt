@@ -616,7 +616,9 @@ class ChatViewModel(
 
     private fun applyTemplateEdits(assistantText: String) {
         val app = getApplication<Application>()
-        val edits = parseTemplateEdits(assistantText)
+        // Tables aren't supported for a locally-uploaded Word template (see parseTemplateEdits) -
+        // only the paragraph text edits apply here.
+        val edits = parseTemplateEdits(assistantText).paragraphs
         if (edits.isEmpty()) {
             _uiState.update { it.copy(errorMessage = app.getString(R.string.error_template_apply)) }
             return
@@ -647,18 +649,18 @@ class ChatViewModel(
     private fun applyGoogleDocEdits(assistantText: String) {
         val app = getApplication<Application>()
         val webAppUrl = currentSettings.templateWebAppUrl
-        val edits = parseTemplateEdits(assistantText)
+        val templateEdits = parseTemplateEdits(assistantText)
         if (webAppUrl.isNullOrBlank()) {
             _uiState.update { it.copy(isSyncingTemplateDoc = false, errorMessage = app.getString(R.string.error_no_template_web_app_url)) }
             return
         }
-        if (edits.isEmpty()) {
+        if (templateEdits.paragraphs.isEmpty() && templateEdits.tables.isEmpty()) {
             _uiState.update { it.copy(isSyncingTemplateDoc = false, errorMessage = app.getString(R.string.error_template_apply)) }
             return
         }
         viewModelScope.launch {
             try {
-                templateDocSyncClient.applyEdits(webAppUrl, edits)
+                templateDocSyncClient.applyEdits(webAppUrl, templateEdits.paragraphs, templateEdits.tables)
                 _uiState.update {
                     it.copy(isSyncingTemplateDoc = false, infoMessage = app.getString(R.string.google_doc_synced))
                 }

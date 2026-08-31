@@ -140,17 +140,19 @@ class DocxTemplateEditorTest {
         }
     }
 
-    // --- parseTemplateEdits ---
+    // --- parseTemplateEdits: [[PARRAFO N]] ---
 
     @Test
-    fun `parseTemplateEdits with no markers returns an empty map`() {
-        assertEquals(emptyMap<Int, String>(), parseTemplateEdits("Hola, aquí no hay nada que aplicar."))
+    fun `parseTemplateEdits with no markers returns empty maps`() {
+        val edits = parseTemplateEdits("Hola, aquí no hay nada que aplicar.")
+        assertEquals(emptyMap<Int, String>(), edits.paragraphs)
+        assertEquals(emptyMap<Int, List<List<String>>>(), edits.tables)
     }
 
     @Test
     fun `parseTemplateEdits reads a single block trimmed`() {
         val text = "[[PARRAFO 1]]\n  Materia: Historia  \n"
-        assertEquals(mapOf(1 to "Materia: Historia"), parseTemplateEdits(text))
+        assertEquals(mapOf(1 to "Materia: Historia"), parseTemplateEdits(text).paragraphs)
     }
 
     @Test
@@ -163,7 +165,7 @@ class DocxTemplateEditorTest {
             Segunda línea del desarrollo.
         """.trimIndent()
 
-        val edits = parseTemplateEdits(text)
+        val edits = parseTemplateEdits(text).paragraphs
 
         assertEquals("Materia: Historia", edits[1])
         assertEquals("Primera línea del desarrollo.\nSegunda línea del desarrollo.", edits[3])
@@ -174,6 +176,53 @@ class DocxTemplateEditorTest {
     fun `parseTemplateEdits keeps the last block when the same index repeats`() {
         val text = "[[PARRAFO 2]]\nprimero\n[[PARRAFO 2]]\nsegundo"
 
-        assertEquals(mapOf(2 to "segundo"), parseTemplateEdits(text))
+        assertEquals(mapOf(2 to "segundo"), parseTemplateEdits(text).paragraphs)
+    }
+
+    // --- parseTemplateEdits: [[TABLA N]] ---
+
+    @Test
+    fun `parseTemplateEdits reads a table block into rows of cells`() {
+        val text = """
+            [[TABLA 2]]
+            Actividad | Fecha | Calificación
+            Ensayo | 01/03/2026 | 9
+            Examen | 15/03/2026 | 8
+        """.trimIndent()
+
+        val tables = parseTemplateEdits(text).tables
+
+        assertEquals(
+            listOf(
+                listOf("Actividad", "Fecha", "Calificación"),
+                listOf("Ensayo", "01/03/2026", "9"),
+                listOf("Examen", "15/03/2026", "8"),
+            ),
+            tables[2],
+        )
+        assertEquals(1, tables.size)
+    }
+
+    @Test
+    fun `parseTemplateEdits trims cell whitespace and skips blank rows`() {
+        val text = "[[TABLA 0]]\n  A  |  B  \n\n C | D \n"
+
+        assertEquals(listOf(listOf("A", "B"), listOf("C", "D")), parseTemplateEdits(text).tables[0])
+    }
+
+    @Test
+    fun `parseTemplateEdits keeps PARRAFO and TABLA blocks independent in the same reply`() {
+        val text = """
+            [[PARRAFO 1]]
+            Resultados de la actividad:
+            [[TABLA 1]]
+            Nombre | Nota
+            Ana | 10
+        """.trimIndent()
+
+        val edits = parseTemplateEdits(text)
+
+        assertEquals(mapOf(1 to "Resultados de la actividad:"), edits.paragraphs)
+        assertEquals(listOf(listOf("Nombre", "Nota"), listOf("Ana", "10")), edits.tables[1])
     }
 }

@@ -2,7 +2,8 @@
 //
 // Lets the app read and edit https://docs.google.com/document/d/1gy_S-aNGET0DQDwp8hLKemsyMahGtfAFBH3gyEp80eA
 // directly: GET returns every paragraph so the assistant can refer to one by index, POST
-// replaces the text of the paragraphs it names and reformats them (see applyParagraphEdit_).
+// replaces the text of the paragraphs it names and reformats them (see applyParagraphEdit_), and
+// can also insert a table right after a named paragraph (see applyTableEdit_).
 // Runs under whoever deploys it - no OAuth is needed on the Android side, only this Web App's
 // (secret) URL, pasted into Ajustes.
 //
@@ -27,12 +28,23 @@ function doPost(e) {
   try {
     var payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     var edits = payload.edits || [];
+    var tableEdits = payload.tableEdits || [];
     var doc = DocumentApp.openById(DOC_ID);
     var paragraphs = doc.getBody().getParagraphs();
+    // Text edits first, while every index in `paragraphs` still matches what the app showed the
+    // assistant - table inserts below only change document structure, never paragraph text, so
+    // they can't invalidate an index a text edit still needs.
     edits.forEach(function (edit) {
       var index = edit && edit.index;
       if (typeof index === 'number' && index >= 0 && index < paragraphs.length) {
         applyParagraphEdit_(paragraphs[index], String(edit.text || ''));
+      }
+    });
+    tableEdits.forEach(function (edit) {
+      var index = edit && edit.index;
+      var rows = edit && edit.rows;
+      if (typeof index === 'number' && index >= 0 && index < paragraphs.length && Array.isArray(rows) && rows.length > 0) {
+        applyTableEdit_(doc, paragraphs[index], rows);
       }
     });
     doc.saveAndClose();
@@ -75,6 +87,41 @@ function applyParagraphEdit_(paragraph, newText) {
     text.setFontSize(10);
     text.setBold(false);
     paragraph.setAlignment(DocumentApp.HorizontalAlignment.JUSTIFY);
+  }
+}
+
+// Inserts a new table right after `paragraph` (never removes or changes that paragraph - it's
+// just the anchor the assistant picked from the numbered listing, e.g. a heading introducing the
+// table). `rows` is a rectangular-ish String[][]; shorter rows are padded with empty cells so
+// insertTable always gets a proper grid. Header row (rows[0]) is rendered bold.
+function applyTableEdit_(doc, paragraph, rows) {
+  var maxCols = rows.reduce(function (max, row) { return Math.max(max, row.length); }, 0);
+  var normalized = rows.map(function (row) {
+    var padded = row.slice();
+    while (padded.length < maxCols) padded.push('');
+    return padded.map(function (cell) { return String(cell); });
+  });
+
+  var body = doc.getBody();
+  var insertAt = body.getChildIndex(paragraph) + 1;
+  var table = body.insertTable(insertAt, normalized);
+  formatTable_(table);
+}
+
+// Same font/color conventions as applyParagraphEdit_'s "texto normal" look, with the header row
+// (first row) bold so the table reads clearly at a glance.
+function formatTable_(table) {
+  for (var r = 0; r < table.getNumRows(); r++) {
+    var row = table.getRow(r);
+    for (var c = 0; c < row.getNumCells(); c++) {
+      var text = row.getCell(c).editAsText();
+      text.setFontFamily('Arial');
+      text.setFontSize(10);
+      text.setForegroundColor('#000000');
+      text.setItalic(false);
+      text.setUnderline(false);
+      text.setBold(r === 0);
+    }
   }
 }
 

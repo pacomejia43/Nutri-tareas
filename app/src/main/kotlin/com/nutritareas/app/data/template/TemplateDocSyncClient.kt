@@ -32,10 +32,17 @@ private data class TemplateSyncResponse(
 )
 
 @Serializable
-private data class TemplateEditsRequest(val edits: List<TemplateEditItem>)
+private data class TemplateEditsRequest(
+    val edits: List<TemplateEditItem>,
+    val tableEdits: List<TemplateTableEditItem> = emptyList(),
+)
 
 @Serializable
 private data class TemplateEditItem(val index: Int, val text: String)
+
+/** [rows] is inserted as a new table right after paragraph [index] - see plantilla-sync.gs's applyTableEdit_. */
+@Serializable
+private data class TemplateTableEditItem(val index: Int, val rows: List<List<String>>)
 
 /**
  * Talks to the Google Apps Script Web App she deploys on [TemplateDocument] to read and write the
@@ -62,9 +69,19 @@ class TemplateDocSyncClient {
         toTemplateParagraphs(execute { Request.Builder().url(webAppUrl).get().build() })
     }
 
-    /** Applies [edits] (paragraph index -> new full text) to the live doc and returns its resulting paragraphs. */
-    suspend fun applyEdits(webAppUrl: String, edits: Map<Int, String>): List<String> = withContext(Dispatchers.IO) {
-        val payload = TemplateEditsRequest(edits.map { (index, text) -> TemplateEditItem(index, text) })
+    /**
+     * Applies [edits] (paragraph index -> new full text) and [tableEdits] (paragraph index -> table
+     * rows to insert right after it) to the live doc, and returns its resulting paragraphs.
+     */
+    suspend fun applyEdits(
+        webAppUrl: String,
+        edits: Map<Int, String>,
+        tableEdits: Map<Int, List<List<String>>> = emptyMap(),
+    ): List<String> = withContext(Dispatchers.IO) {
+        val payload = TemplateEditsRequest(
+            edits = edits.map { (index, text) -> TemplateEditItem(index, text) },
+            tableEdits = tableEdits.map { (index, rows) -> TemplateTableEditItem(index, rows) },
+        )
         execute {
             Request.Builder()
                 .url(webAppUrl)
