@@ -20,8 +20,12 @@
     <string name="share_document">Compartir</string>
     <string name="message_copied">Mensaje copiado</string>
     <string name="pdf_loaded_message">PDF cargado: %1$s (%2$d páginas)</string>
-    <string name="pdf_pending_message">%1$s (%2$d páginas) listo para enviar. Escribe algo de contexto o toca enviar.</string>
-    <string name="pdf_attach_intro">He adjuntado %1$s. Léelo y dime si necesitas algo de mí antes de empezar a desarrollar las tareas.</string>
+    <string name="pdf_pending_item">%1$s (%2$d páginas)</string>
+    <string name="pdf_pending_hint">Escribe algo de contexto o toca enviar.</string>
+    <plurals name="pdf_attach_intro">
+        <item quantity="one">He adjuntado %1$s. Léelo y dime si necesitas algo de mí antes de empezar a desarrollar las tareas.</item>
+        <item quantity="other">He adjuntado %1$s. Léelos y dime si necesitas algo de mí antes de empezar a desarrollar las tareas.</item>
+    </plurals>
     <plurals name="image_attach_intro">
         <item quantity="one">Te adjunté %1$d captura. Léela y dime si necesitas algo de mí antes de empezar a desarrollar las tareas.</item>
         <item quantity="other">Te adjunté %1$d capturas. Léelas y dime si necesitas algo de mí antes de empezar a desarrollar las tareas.</item>

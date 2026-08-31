@@ -20,6 +20,7 @@ import com.anthropic.models.messages.TextBlockParam
 import com.anthropic.models.messages.ThinkingConfigAdaptive
 import com.nutritareas.app.data.chat.ChatImageAttachment
 import com.nutritareas.app.data.chat.ChatMessage
+import com.nutritareas.app.data.chat.ChatPdfAttachment
 import com.nutritareas.app.data.chat.ChatRole
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
@@ -32,7 +33,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Talks to Claude via the official Anthropic Java SDK. The Messages API is stateless per request,
- * so every call resends the full conversation; the PDF (if any) is re-attached as a cached
+ * so every call resends the full conversation; every attached PDF is re-attached as a cached
  * document block on the first user turn so it isn't re-billed as fresh input on every message,
  * and any screenshots a user turn carried are re-attached as image blocks on that same turn.
  */
@@ -42,9 +43,7 @@ class ClaudeAssistantClient : AssistantClient {
         apiKey: String,
         modelId: String,
         history: List<ChatMessage>,
-        pdfBase64: String?,
-        pdfFileName: String?,
-        pdfMarkdown: String?,
+        pdfAttachments: List<ChatPdfAttachment>,
         newUserText: String,
         newUserImages: List<ChatImageAttachment>,
     ): Flow<AssistantStreamEvent> = callbackFlow {
@@ -53,7 +52,7 @@ class ClaudeAssistantClient : AssistantClient {
         val job = launch(Dispatchers.IO) {
             val textBuilder = StringBuilder()
             try {
-                val params = buildParams(modelId, history, pdfBase64, pdfFileName, pdfMarkdown, newUserText, newUserImages)
+                val params = buildParams(modelId, history, pdfAttachments, newUserText, newUserImages)
                 client.messages().createStreaming(params).use { streamResponse ->
                     streamResponse.stream().forEach { event ->
                         event.contentBlockDelta().ifPresent { delta ->
@@ -97,9 +96,7 @@ class ClaudeAssistantClient : AssistantClient {
     private fun buildParams(
         modelId: String,
         history: List<ChatMessage>,
-        pdfBase64: String?,
-        pdfFileName: String?,
-        pdfMarkdown: String?,
+        pdfAttachments: List<ChatPdfAttachment>,
         newUserText: String,
         newUserImages: List<ChatImageAttachment>,
     ): MessageCreateParams {
@@ -110,31 +107,27 @@ class ClaudeAssistantClient : AssistantClient {
             .thinking(ThinkingConfigAdaptive.builder().build())
             .outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.HIGH).build())
 
-        var pdfAttached = false
+        var pdfsAttached = false
         for (message in history) {
-            val attachPdfHere = !pdfAttached && message.role == ChatRole.USER && (pdfBase64 != null || pdfMarkdown != null)
-            if (attachPdfHere) pdfAttached = true
+            val attachPdfsHere = !pdfsAttached && message.role == ChatRole.USER && pdfAttachments.isNotEmpty()
+            if (attachPdfsHere) pdfsAttached = true
             builder.addMessage(
                 toMessageParam(
                     role = message.role,
                     text = message.text,
                     images = message.imageAttachments,
-                    pdfBase64 = if (attachPdfHere) pdfBase64 else null,
-                    pdfFileName = pdfFileName,
-                    pdfMarkdown = if (attachPdfHere) pdfMarkdown else null,
+                    pdfs = if (attachPdfsHere) pdfAttachments else emptyList(),
                 ),
             )
         }
 
-        val attachPdfOnNewTurn = !pdfAttached && (pdfBase64 != null || pdfMarkdown != null)
+        val attachPdfsOnNewTurn = !pdfsAttached && pdfAttachments.isNotEmpty()
         builder.addMessage(
             toMessageParam(
                 role = ChatRole.USER,
                 text = newUserText,
                 images = newUserImages,
-                pdfBase64 = if (attachPdfOnNewTurn) pdfBase64 else null,
-                pdfFileName = pdfFileName,
-                pdfMarkdown = if (attachPdfOnNewTurn) pdfMarkdown else null,
+                pdfs = if (attachPdfsOnNewTurn) pdfAttachments else emptyList(),
             ),
         )
 
@@ -146,24 +139,24 @@ class ClaudeAssistantClient : AssistantClient {
         role: ChatRole,
         text: String,
         images: List<ChatImageAttachment>,
-        pdfBase64: String?,
-        pdfFileName: String?,
-        pdfMarkdown: String?,
+        pdfs: List<ChatPdfAttachment>,
     ): MessageParam {
         val sdkRole = if (role == ChatRole.USER) MessageParam.Role.USER else MessageParam.Role.ASSISTANT
-        if (pdfBase64 == null && pdfMarkdown == null && images.isEmpty()) {
+        if (pdfs.isEmpty() && images.isEmpty()) {
             return MessageParam.builder().role(sdkRole).content(text).build()
         }
         val blocks = mutableListOf<ContentBlockParam>()
-        if (pdfMarkdown != null) {
-            blocks += ContentBlockParam.ofText(TextBlockParam.builder().text(pdfMarkdown).build())
-        } else if (pdfBase64 != null) {
-            val document = DocumentBlockParam.builder()
-                .source(Base64PdfSource.builder().data(pdfBase64).build())
-                .title(pdfFileName ?: "documento.pdf")
-                .cacheControl(CacheControlEphemeral.builder().build())
-                .build()
-            blocks += ContentBlockParam.ofDocument(document)
+        for (pdf in pdfs) {
+            if (pdf.markdown != null) {
+                blocks += ContentBlockParam.ofText(TextBlockParam.builder().text(pdf.markdown).build())
+            } else if (pdf.base64 != null) {
+                val document = DocumentBlockParam.builder()
+                    .source(Base64PdfSource.builder().data(pdf.base64).build())
+                    .title(pdf.fileName)
+                    .cacheControl(CacheControlEphemeral.builder().build())
+                    .build()
+                blocks += ContentBlockParam.ofDocument(document)
+            }
         }
         for (image in images) {
             val source = Base64ImageSource.builder()

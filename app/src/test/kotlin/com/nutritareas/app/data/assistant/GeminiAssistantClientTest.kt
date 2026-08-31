@@ -2,6 +2,7 @@ package com.nutritareas.app.data.assistant
 
 import com.nutritareas.app.data.chat.ChatImageAttachment
 import com.nutritareas.app.data.chat.ChatMessage
+import com.nutritareas.app.data.chat.ChatPdfAttachment
 import com.nutritareas.app.data.chat.ChatRole
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -24,9 +25,11 @@ class GeminiAssistantClientTest {
         imageAttachments = images,
     )
 
+    private fun pdf(fileName: String, base64: String) = ChatPdfAttachment(fileName = fileName, pageCount = 1, base64 = base64)
+
     @Test
     fun `new turn with no history, pdf or images is a single plain text part`() {
-        val request = client.buildRequestBody(history = emptyList(), pdfBase64 = null, newUserText = "Hola", newUserImages = emptyList())
+        val request = client.buildRequestBody(history = emptyList(), pdfAttachments = emptyList(), newUserText = "Hola", newUserImages = emptyList())
 
         assertEquals(1, request.contents.size)
         assertEquals("user", request.contents[0].role)
@@ -41,7 +44,12 @@ class GeminiAssistantClientTest {
             message(ChatRole.USER, "¿ya terminaste?"),
         )
 
-        val request = client.buildRequestBody(history = history, pdfBase64 = "UERGQkFTRTY0", newUserText = "¿algo más?", newUserImages = emptyList())
+        val request = client.buildRequestBody(
+            history = history,
+            pdfAttachments = listOf(pdf("tareas.pdf", "UERGQkFTRTY0")),
+            newUserText = "¿algo más?",
+            newUserImages = emptyList(),
+        )
 
         assertEquals(4, request.contents.size)
         val firstTurnParts = request.contents[0].parts
@@ -55,10 +63,31 @@ class GeminiAssistantClientTest {
     fun `pdf attaches on the new turn when history has no prior user message`() {
         val history = listOf(message(ChatRole.ASSISTANT, "hola, mándame tus tareas"))
 
-        val request = client.buildRequestBody(history = history, pdfBase64 = "UERGQkFTRTY0", newUserText = "aquí va", newUserImages = emptyList())
+        val request = client.buildRequestBody(
+            history = history,
+            pdfAttachments = listOf(pdf("tareas.pdf", "UERGQkFTRTY0")),
+            newUserText = "aquí va",
+            newUserImages = emptyList(),
+        )
 
         assertTrue(request.contents[0].parts.none { it.inlineData != null })
         assertTrue(request.contents[1].parts.any { it.inlineData?.mimeType == "application/pdf" })
+    }
+
+    @Test
+    fun `multiple pdfs all attach together on the same first user turn`() {
+        val request = client.buildRequestBody(
+            history = emptyList(),
+            pdfAttachments = listOf(pdf("matematicas.pdf", "TUFURQ=="), pdf("historia.pdf", "SElTVA==")),
+            newUserText = "aquí van mis dos tareas",
+            newUserImages = emptyList(),
+        )
+
+        val parts = request.contents.single().parts
+        val pdfParts = parts.filter { it.inlineData?.mimeType == "application/pdf" }
+        assertEquals(2, pdfParts.size)
+        assertEquals(listOf("TUFURQ==", "SElTVA=="), pdfParts.map { it.inlineData?.data })
+        assertEquals("aquí van mis dos tareas", parts.last().text)
     }
 
     @Test
@@ -68,7 +97,7 @@ class GeminiAssistantClientTest {
             ChatImageAttachment(base64 = "aW1nMg==", mimeType = "image/jpeg"),
         )
 
-        val request = client.buildRequestBody(history = emptyList(), pdfBase64 = null, newUserText = "mira esto", newUserImages = images)
+        val request = client.buildRequestBody(history = emptyList(), pdfAttachments = emptyList(), newUserText = "mira esto", newUserImages = images)
 
         val parts = request.contents.single().parts
         assertEquals(3, parts.size)
@@ -84,7 +113,7 @@ class GeminiAssistantClientTest {
             message(ChatRole.ASSISTANT, "ya la vi"),
         )
 
-        val request = client.buildRequestBody(history = history, pdfBase64 = null, newUserText = "gracias", newUserImages = emptyList())
+        val request = client.buildRequestBody(history = history, pdfAttachments = emptyList(), newUserText = "gracias", newUserImages = emptyList())
 
         assertTrue(request.contents[0].parts.any { it.inlineData?.mimeType == "image/png" })
         assertTrue(request.contents[1].parts.none { it.inlineData != null })
@@ -95,7 +124,7 @@ class GeminiAssistantClientTest {
     fun `assistant turns map to Gemini's 'model' role`() {
         val history = listOf(message(ChatRole.ASSISTANT, "respuesta anterior"))
 
-        val request = client.buildRequestBody(history = history, pdfBase64 = null, newUserText = "sigue", newUserImages = emptyList())
+        val request = client.buildRequestBody(history = history, pdfAttachments = emptyList(), newUserText = "sigue", newUserImages = emptyList())
 
         assertEquals("model", request.contents[0].role)
         assertEquals("user", request.contents[1].role)
@@ -103,7 +132,7 @@ class GeminiAssistantClientTest {
 
     @Test
     fun `system instruction carries the persona prompt with no role`() {
-        val request = client.buildRequestBody(history = emptyList(), pdfBase64 = null, newUserText = "hola", newUserImages = emptyList())
+        val request = client.buildRequestBody(history = emptyList(), pdfAttachments = emptyList(), newUserText = "hola", newUserImages = emptyList())
 
         assertEquals(AssistantPersona.systemPrompt, request.systemInstruction?.parts?.single()?.text)
         assertNull(request.systemInstruction?.role)
@@ -111,7 +140,7 @@ class GeminiAssistantClientTest {
 
     @Test
     fun `request encodes with camelCase field names and drops null fields`() {
-        val request = client.buildRequestBody(history = emptyList(), pdfBase64 = null, newUserText = "hola", newUserImages = emptyList())
+        val request = client.buildRequestBody(history = emptyList(), pdfAttachments = emptyList(), newUserText = "hola", newUserImages = emptyList())
 
         val encoded = json.encodeToString(request)
 

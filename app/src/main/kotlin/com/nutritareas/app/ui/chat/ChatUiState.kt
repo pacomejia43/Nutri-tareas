@@ -5,12 +5,14 @@ import com.nutritareas.app.data.chat.ChatMessage
 import com.nutritareas.app.data.settings.AssistantProvider
 import com.nutritareas.app.data.template.TemplateParagraph
 
+/** Lightweight display info for a PDF, attached or still pending - the actual base64/markdown
+ *  payload stays out of UI state, which only needs to show what's there and let her remove it. */
+data class PdfSummary(val id: String, val fileName: String, val pageCount: Int)
+
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
-    val pdfFileName: String? = null,
-    val pdfPageCount: Int = 0,
-    val pendingPdfFileName: String? = null,
-    val pendingPdfPageCount: Int = 0,
+    val pdfAttachments: List<PdfSummary> = emptyList(),
+    val pendingPdfAttachments: List<PdfSummary> = emptyList(),
     val inputText: String = "",
     val isAssistantResponding: Boolean = false,
     val streamingText: String = "",
@@ -37,12 +39,12 @@ data class ChatUiState(
     val hasApiKey: Boolean = true,
     val activeProvider: AssistantProvider = AssistantProvider.CLAUDE,
 ) {
-    val hasPdf: Boolean get() = pdfFileName != null
-    val hasPendingPdf: Boolean get() = pendingPdfFileName != null
+    val hasPdf: Boolean get() = pdfAttachments.isNotEmpty()
+    val hasPendingPdf: Boolean get() = pendingPdfAttachments.isNotEmpty()
     val hasTemplate: Boolean get() = templateFileName != null
     val isEditingMessage: Boolean get() = editingMessageId != null
     val canSend: Boolean get() = !isAssistantResponding && (inputText.isNotBlank() || hasPendingPdf)
-    val canAttachPdf: Boolean get() = !hasPdf && !hasPendingPdf && !isAssistantResponding && !isLoadingPdf
+    val canAttachPdf: Boolean get() = !isAssistantResponding && !isLoadingPdf
     val canAttachImages: Boolean get() = !isAssistantResponding && !isLoadingImages
     val canAttachTemplate: Boolean get() = !hasTemplate && !isAssistantResponding && !isLoadingTemplate
     val canApplyTemplate: Boolean get() = hasTemplate && !isAssistantResponding && !isBuildingDocument && messages.isNotEmpty()

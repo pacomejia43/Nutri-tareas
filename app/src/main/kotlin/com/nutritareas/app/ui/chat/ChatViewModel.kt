@@ -21,6 +21,7 @@ import com.nutritareas.app.data.assistant.parseImageRequest
 import com.nutritareas.app.data.chat.ChatHistoryStore
 import com.nutritareas.app.data.chat.ChatImageAttachment
 import com.nutritareas.app.data.chat.ChatMessage
+import com.nutritareas.app.data.chat.ChatPdfAttachment
 import com.nutritareas.app.data.chat.ChatRole
 import com.nutritareas.app.data.chat.ChatSession
 import com.nutritareas.app.data.docx.DocxTemplate
@@ -51,6 +52,22 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+/** A staged PDF, not yet sent - [id] is what [ChatViewModel.onCancelPendingPdf] removes by. */
+private data class PendingPdf(val id: String = UUID.randomUUID().toString(), val content: PdfContent) {
+    fun toSummary() = PdfSummary(id, content.fileName, content.pageCount)
+    fun toChatAttachment() = ChatPdfAttachment(
+        fileName = content.fileName,
+        pageCount = content.pageCount,
+        base64 = if (content.markdown == null) content.base64 else null,
+        markdown = content.markdown,
+    )
+}
+
+/** Indexed rather than by file name alone - two attached PDFs can share a name, and [PdfSummary.id]
+ *  needs to stay unique for Compose's LazyRow keys. */
+private fun List<ChatPdfAttachment>.toSummaries(): List<PdfSummary> =
+    mapIndexed { index, pdf -> PdfSummary(id = "$index-${pdf.fileName}", fileName = pdf.fileName, pageCount = pdf.pageCount) }
+
 class ChatViewModel(
     application: Application,
     private val settingsRepository: SettingsRepository,
@@ -70,7 +87,7 @@ class ChatViewModel(
     private var currentSettings: AppSettings = AppSettings()
     private var readyDocumentFile: File? = null
     private var readyImageFile: File? = null
-    private var pendingPdfContent: PdfContent? = null
+    private var pendingPdfs: List<PendingPdf> = emptyList()
     private var templatePreviewJob: Job? = null
 
     init {
@@ -81,8 +98,7 @@ class ChatViewModel(
             _uiState.update {
                 it.copy(
                     messages = session.messages,
-                    pdfFileName = session.pdfFileName,
-                    pdfPageCount = session.pdfPageCount,
+                    pdfAttachments = session.pdfAttachments.toSummaries(),
                     templateFileName = session.templateFileName,
                     templateParagraphCount = session.templateParagraphs.size,
                 )
@@ -113,9 +129,10 @@ class ChatViewModel(
     }
 
     /**
-     * Plain text sends immediately. A pending PDF (attached but not yet sent - see
-     * [onAttachPdfPicked]) only goes out when she taps send: it's committed to [session] here,
-     * using whatever she typed as the message, or a generic intro if she sent it with no caption.
+     * Plain text sends immediately. Any pending PDFs (attached but not yet sent - see
+     * [onAttachPdfPicked]) only go out when she taps send: they're committed to [session] here,
+     * added to whichever ones are already attached, using whatever she typed as the message, or a
+     * generic intro naming them if she sent it with no caption.
      */
     fun onSendClick() {
         if (_uiState.value.isAssistantResponding) return
@@ -126,28 +143,22 @@ class ChatViewModel(
             resendEditedMessage(editingId, text)
             return
         }
-        val pendingPdf = pendingPdfContent
+        val pending = pendingPdfs
         val messageText = when {
             text.isNotEmpty() -> text
-            pendingPdf != null -> getApplication<Application>().getString(R.string.pdf_attach_intro, pendingPdf.fileName)
+            pending.isNotEmpty() -> {
+                val app = getApplication<Application>()
+                val fileNames = pending.joinToString(", ") { it.content.fileName }
+                app.resources.getQuantityString(R.plurals.pdf_attach_intro, pending.size, fileNames)
+            }
             else -> return
         }
         _uiState.update { it.copy(inputText = "") }
-        if (pendingPdf != null) {
-            session = session.copy(
-                pdfFileName = pendingPdf.fileName,
-                pdfPageCount = pendingPdf.pageCount,
-                pdfBase64 = if (pendingPdf.markdown == null) pendingPdf.base64 else null,
-                pdfMarkdown = pendingPdf.markdown,
-            )
-            pendingPdfContent = null
+        if (pending.isNotEmpty()) {
+            session = session.copy(pdfAttachments = session.pdfAttachments + pending.map { it.toChatAttachment() })
+            pendingPdfs = emptyList()
             _uiState.update {
-                it.copy(
-                    pdfFileName = pendingPdf.fileName,
-                    pdfPageCount = pendingPdf.pageCount,
-                    pendingPdfFileName = null,
-                    pendingPdfPageCount = 0,
-                )
+                it.copy(pdfAttachments = session.pdfAttachments.toSummaries(), pendingPdfAttachments = emptyList())
             }
         }
         sendTurn(messageText)
@@ -180,17 +191,21 @@ class ChatViewModel(
         sendTurn(newText)
     }
 
-    /** Just stages the PDF - it's not sent until she taps send (see [onSendClick]), so she can add context first. */
-    fun onAttachPdfPicked(uri: Uri) {
-        if (_uiState.value.isLoadingPdf) return
+    /**
+     * Just stages the PDF(s) - not sent until she taps send (see [onSendClick]), so she can add
+     * context first. Can be called again to add more, even with PDFs already pending or already
+     * attached to the session - there's no cap on how many she can bring into one conversation.
+     */
+    fun onAttachPdfPicked(uris: List<Uri>) {
+        if (uris.isEmpty() || _uiState.value.isLoadingPdf) return
         _uiState.update { it.copy(isLoadingPdf = true, errorMessage = null) }
         viewModelScope.launch {
             val app = getApplication<Application>()
             try {
-                val content = pdfTextExtractor.extract(uri)
-                pendingPdfContent = content
+                val newPending = uris.map { uri -> PendingPdf(content = pdfTextExtractor.extract(uri)) }
+                pendingPdfs = pendingPdfs + newPending
                 _uiState.update {
-                    it.copy(isLoadingPdf = false, pendingPdfFileName = content.fileName, pendingPdfPageCount = content.pageCount)
+                    it.copy(isLoadingPdf = false, pendingPdfAttachments = pendingPdfs.map { p -> p.toSummary() })
                 }
             } catch (e: PdfReadException) {
                 _uiState.update { it.copy(isLoadingPdf = false, errorMessage = app.getString(R.string.error_pdf_read)) }
@@ -198,9 +213,9 @@ class ChatViewModel(
         }
     }
 
-    fun onCancelPendingPdf() {
-        pendingPdfContent = null
-        _uiState.update { it.copy(pendingPdfFileName = null, pendingPdfPageCount = 0) }
+    fun onCancelPendingPdf(id: String) {
+        pendingPdfs = pendingPdfs.filterNot { it.id == id }
+        _uiState.update { it.copy(pendingPdfAttachments = pendingPdfs.map { p -> p.toSummary() }) }
     }
 
     /** Screenshots/photos of tasks from her phone - read the same way the PDF is, but can arrive any time, more than once. */
@@ -358,7 +373,7 @@ class ChatViewModel(
     fun onConfirmNewConversation() {
         readyDocumentFile = null
         readyImageFile = null
-        pendingPdfContent = null
+        pendingPdfs = emptyList()
         templatePreviewJob?.cancel()
         templatePreviewJob = null
         viewModelScope.launch {
@@ -485,9 +500,7 @@ class ChatViewModel(
             apiKey = apiKey,
             modelId = modelId,
             history = history,
-            pdfBase64 = session.pdfBase64,
-            pdfFileName = session.pdfFileName,
-            pdfMarkdown = session.pdfMarkdown,
+            pdfAttachments = session.pdfAttachments,
             newUserText = requestText,
             newUserImages = images,
         ).collect { event ->

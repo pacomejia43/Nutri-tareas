@@ -74,7 +74,7 @@ import com.nutritareas.app.ui.chat.components.EditingMessageRow
 import com.nutritareas.app.ui.chat.components.ImageReadyRow
 import com.nutritareas.app.ui.chat.components.MessageBubble
 import com.nutritareas.app.ui.chat.components.NutritionBackdrop
-import com.nutritareas.app.ui.chat.components.PdfChip
+import com.nutritareas.app.ui.chat.components.PdfChipsRow
 import com.nutritareas.app.ui.chat.components.PendingPdfRow
 import com.nutritareas.app.ui.chat.components.TemplateChip
 import com.nutritareas.app.ui.chat.components.TemplateDocPreviewDialog
@@ -93,8 +93,8 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
     val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
 
-    val pdfPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let(viewModel::onAttachPdfPicked)
+    val pdfPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        viewModel.onAttachPdfPicked(uris)
     }
     val imagePickerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(),
@@ -209,10 +209,9 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 if (uiState.canApplyTemplate) {
                     ApplyTemplateRow(isBuilding = uiState.isBuildingDocument, onClick = viewModel::onApplyTemplateClick)
                 }
-                uiState.pendingPdfFileName?.let { fileName ->
+                if (uiState.hasPendingPdf) {
                     PendingPdfRow(
-                        fileName = fileName,
-                        pageCount = uiState.pendingPdfPageCount,
+                        pdfs = uiState.pendingPdfAttachments,
                         onCancel = viewModel::onCancelPendingPdf,
                     )
                 }
@@ -248,7 +247,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
                 if (uiState.hasPdf) {
-                    PdfChip(fileName = uiState.pdfFileName.orEmpty(), pageCount = uiState.pdfPageCount)
+                    PdfChipsRow(pdfs = uiState.pdfAttachments)
                 }
                 if (uiState.hasTemplate) {
                     TemplateChip(
