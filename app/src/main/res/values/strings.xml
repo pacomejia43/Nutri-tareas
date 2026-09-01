@@ -65,6 +65,7 @@
     <string name="error_no_template_web_app_url">Primero configura la URL de la plantilla de Google Docs en Ajustes.</string>
     <string name="error_template_sync">No se pudo sincronizar con la plantilla de Google Docs. Revisa tu conexión o la URL en Ajustes.</string>
     <string name="error_network">No hay conexión a internet. Revisa tu conexión e inténtalo de nuevo.</string>
+    <string name="error_timeout">Esto está tardando más de lo normal (por ejemplo, por un PDF muy grande o una conversación larga). Inténtalo de nuevo en un momento.</string>
     <string name="error_invalid_api_key">Tu clave de API no es válida o fue revocada. Revísala en Ajustes.</string>
     <string name="error_rate_limited">Se alcanzó el límite de uso de la API. Espera un momento e inténtalo de nuevo.</string>
     <string name="error_no_gemini_key_for_image">Para generar imágenes necesito tu clave de Gemini. Configúrala en Ajustes, aunque estés conversando con Claude.</string>

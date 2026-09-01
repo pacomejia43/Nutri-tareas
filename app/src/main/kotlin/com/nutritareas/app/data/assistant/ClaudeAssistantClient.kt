@@ -23,6 +23,7 @@ import com.nutritareas.app.data.chat.ChatMessage
 import com.nutritareas.app.data.chat.ChatPdfAttachment
 import com.nutritareas.app.data.chat.ChatRole
 import java.io.IOException
+import java.time.Duration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
@@ -47,7 +48,17 @@ class ClaudeAssistantClient : AssistantClient {
         newUserText: String,
         newUserImages: List<ChatImageAttachment>,
     ): Flow<AssistantStreamEvent> = callbackFlow {
-        val client = AnthropicOkHttpClient.builder().apiKey(apiKey).build()
+        // Left unset, the SDK's own dynamic default scales with maxTokens for a streaming request
+        // (up to an hour for a large maxTokens like ours) - with nothing to show her in the
+        // meantime beyond "Pensando…", that read as the app being frozen. maxRetries(0) hands retry
+        // control entirely to ChatViewModel.runAssistantTurn, which already retries with backoff and
+        // visible feedback - letting the SDK also silently retry underneath would just re-multiply
+        // the same long wait.
+        val client = AnthropicOkHttpClient.builder()
+            .apiKey(apiKey)
+            .timeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS))
+            .maxRetries(0)
+            .build()
 
         val job = launch(Dispatchers.IO) {
             val textBuilder = StringBuilder()
@@ -73,9 +84,9 @@ class ClaudeAssistantClient : AssistantClient {
             } catch (e: InternalServerException) {
                 trySend(AssistantStreamEvent.Failed(AssistantError.ServerError(e)))
             } catch (e: AnthropicIoException) {
-                trySend(AssistantStreamEvent.Failed(AssistantError.Network(e)))
+                trySend(AssistantStreamEvent.Failed(if (e.hasTimeoutCause()) AssistantError.Timeout(e) else AssistantError.Network(e)))
             } catch (e: IOException) {
-                trySend(AssistantStreamEvent.Failed(AssistantError.Network(e)))
+                trySend(AssistantStreamEvent.Failed(if (e.hasTimeoutCause()) AssistantError.Timeout(e) else AssistantError.Network(e)))
             } catch (e: AnthropicServiceException) {
                 trySend(AssistantStreamEvent.Failed(AssistantError.Unknown(e)))
             } catch (e: Exception) {
@@ -178,5 +189,6 @@ class ClaudeAssistantClient : AssistantClient {
 
     companion object {
         private const val MAX_TOKENS = 64000L
+        private const val REQUEST_TIMEOUT_SECONDS = 180L
     }
 }

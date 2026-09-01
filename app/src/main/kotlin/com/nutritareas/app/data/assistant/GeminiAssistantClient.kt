@@ -92,7 +92,7 @@ class GeminiAssistantClient : AssistantClient {
                     trySend(AssistantStreamEvent.Completed(textBuilder.toString()))
                 }
             } catch (e: IOException) {
-                trySend(AssistantStreamEvent.Failed(AssistantError.Network(e)))
+                trySend(AssistantStreamEvent.Failed(if (e.hasTimeoutCause()) AssistantError.Timeout(e) else AssistantError.Network(e)))
             } catch (e: Exception) {
                 trySend(AssistantStreamEvent.Failed(AssistantError.Unknown(e)))
             }
@@ -136,7 +136,7 @@ class GeminiAssistantClient : AssistantClient {
                 GeneratedImage(base64 = imageData.data, mimeType = imageData.mimeType)
             }
         } catch (e: IOException) {
-            throw AssistantError.Network(e)
+            throw if (e.hasTimeoutCause()) AssistantError.Timeout(e) else AssistantError.Network(e)
         }
     }
 

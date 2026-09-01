@@ -658,12 +658,15 @@ class ChatViewModel(
 
     /**
      * Streams one assistant turn. A transient failure - Claude/Gemini returning 5xx (e.g. Gemini's
-     * "the model is currently experiencing high demand"), or a network hiccup/timeout (e.g. a slow
-     * mobile upload of a large PDF that outran the write timeout) - is retried silently up to
-     * [MAX_TRANSIENT_RETRIES] times with backoff before it's shown as an error bubble, since these
-     * clear up on their own within a few seconds almost every time. Without this, a merely-slow
-     * connection surfaced as a scary (and misleading) "no hay conexión a internet" on the very
-     * first hiccup.
+     * "the model is currently experiencing high demand"), or a network hiccup - is retried silently
+     * with backoff before it's shown as an error bubble, since these clear up on their own within a
+     * few seconds almost every time (see [maxRetriesFor] for how many times, per error kind). A
+     * genuine timeout - the request ran the full [ClaudeAssistantClient]/[GeminiAssistantClient]
+     * deadline without finishing, e.g. a big PDF plus a long conversation taking a while to process -
+     * is NOT retried: retrying would just repeat the same slow work and could leave her staring at
+     * "Pensando…" for several more minutes, which is exactly what looked like the app being frozen
+     * before this distinction existed. It fails fast instead, with copy that says it was slow rather
+     * than the misleading "no hay conexión a internet" a timeout used to show.
      */
     private suspend fun runAssistantTurn(
         client: AssistantClient,
@@ -718,8 +721,7 @@ class ChatViewModel(
                 }
 
                 is AssistantStreamEvent.Failed -> {
-                    val isTransient = event.error is AssistantError.ServerError || event.error is AssistantError.Network
-                    if (isTransient && attempt < MAX_TRANSIENT_RETRIES) {
+                    if (attempt < maxRetriesFor(event.error)) {
                         _uiState.update { it.copy(streamingText = "") }
                         delay(transientRetryDelayMs(attempt))
                         runAssistantTurn(
@@ -885,6 +887,7 @@ class ChatViewModel(
             is AssistantError.InvalidApiKey -> app.getString(R.string.error_invalid_api_key)
             is AssistantError.RateLimited -> app.getString(R.string.error_rate_limited)
             is AssistantError.Network -> app.getString(R.string.error_network)
+            is AssistantError.Timeout -> app.getString(R.string.error_timeout)
             is AssistantError.ModelNotFound,
             is AssistantError.ServerError,
             is AssistantError.Unknown,
@@ -903,6 +906,20 @@ class ChatViewModel(
         viewModelScope.launch { chatHistoryStore.save(snapshot) }
     }
 
+    /**
+     * How many times [runAssistantTurn] retries a given failure before giving up. ServerError (5xx)
+     * fails fast - the server responds with an error status almost immediately - so several retries
+     * cost little. Network (DNS/connect failures) also fails fast, so a couple of quick retries can
+     * catch a brief Wi-Fi blip. Timeout is the opposite: by definition it already waited the full
+     * client-side deadline before failing, so retrying would silently repeat that same long wait -
+     * not worth it, it fails straight to an error bubble instead (see [runAssistantTurn]'s doc).
+     */
+    private fun maxRetriesFor(error: AssistantError): Int = when (error) {
+        is AssistantError.ServerError -> MAX_RETRIES_SERVER_ERROR
+        is AssistantError.Network -> MAX_RETRIES_NETWORK
+        else -> 0
+    }
+
     /** Exponential backoff for [runAssistantTurn]'s retries, capped so a long spike (Gemini's "high
      *  demand" 503 can run well past the couple of seconds the old fixed short delay allowed for)
      *  doesn't leave her waiting forever either. */
@@ -911,7 +928,8 @@ class ChatViewModel(
 
     companion object {
         private const val TEMPLATE_PREVIEW_POLL_INTERVAL_MS = 4000L
-        private const val MAX_TRANSIENT_RETRIES = 4
+        private const val MAX_RETRIES_SERVER_ERROR = 4
+        private const val MAX_RETRIES_NETWORK = 2
         private const val TRANSIENT_RETRY_BASE_DELAY_MS = 1500L
         private const val TRANSIENT_RETRY_MAX_DELAY_MS = 10_000L
 
