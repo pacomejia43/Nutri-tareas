@@ -114,9 +114,27 @@ class ClaudeAssistantClient : AssistantClient {
         val builder = MessageCreateParams.builder()
             .model(modelId)
             .maxTokens(MAX_TOKENS)
-            .system(AssistantPersona.systemPrompt)
+            // The persona prompt never changes between turns or conversations, so it's worth
+            // caching same as the PDFs below - .system(String) can't carry cache_control, hence
+            // the more verbose block form. A 1-hour TTL survives her actually reading and typing
+            // a reply, unlike the default 5-minute one, which a normal back-and-forth could miss.
+            .systemOfTextBlockParams(
+                listOf(
+                    TextBlockParam.builder()
+                        .text(AssistantPersona.systemPrompt)
+                        .cacheControl(CacheControlEphemeral.builder().ttl(CacheControlEphemeral.Ttl.TTL_1H).build())
+                        .build(),
+                ),
+            )
             .thinking(ThinkingConfigAdaptive.builder().build())
-            .outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.HIGH).build())
+            // HIGH is literally the same as not setting effort at all (Anthropic's own docs say
+            // so) - it's meant for hard coding/agentic work, not a chat app, and is a big reason
+            // Claude here felt much slower than the official Claude app/website: those aren't
+            // calling the raw API at its default, unthrottled effort for ordinary conversation.
+            // MEDIUM keeps adaptive thinking (Claude still reasons harder when a turn genuinely
+            // needs it - a tricky nutrition formula, a full essay) while capping how much time/
+            // tokens it spends on routine turns, which is most of them.
+            .outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.MEDIUM).build())
 
         var pdfsAttached = false
         for (message in history) {
@@ -164,7 +182,7 @@ class ClaudeAssistantClient : AssistantClient {
                 val document = DocumentBlockParam.builder()
                     .source(Base64PdfSource.builder().data(pdf.base64).build())
                     .title(pdf.fileName)
-                    .cacheControl(CacheControlEphemeral.builder().build())
+                    .cacheControl(CacheControlEphemeral.builder().ttl(CacheControlEphemeral.Ttl.TTL_1H).build())
                     .build()
                 blocks += ContentBlockParam.ofDocument(document)
             }
