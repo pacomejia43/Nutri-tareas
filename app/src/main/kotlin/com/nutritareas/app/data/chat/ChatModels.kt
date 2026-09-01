@@ -1,5 +1,6 @@
 package com.nutritareas.app.data.chat
 
+import java.util.UUID
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -33,12 +34,21 @@ data class ChatMessage(
     val imageAttachments: List<ChatImageAttachment> = emptyList(),
 )
 
-/** The full state of "today's" conversation: the transcript plus the PDFs/template it's anchored to, if any. */
+/** The full state of one conversation ("tarea"): the transcript plus the PDFs/template it's
+ *  anchored to, if any. She can keep several of these at once - see [ChatSessionsData]. */
 @Serializable
 data class ChatSession(
+    val id: String = UUID.randomUUID().toString(),
     val messages: List<ChatMessage> = emptyList(),
     val pdfAttachments: List<ChatPdfAttachment> = emptyList(),
     val templateFileName: String? = null,
     val templateParagraphs: List<String> = emptyList(),
     val templateEntriesBase64: Map<String, String> = emptyMap(),
+)
+
+/** Everything [ChatHistoryStore] persists: every conversation she's kept, and which one is on screen. */
+@Serializable
+data class ChatSessionsData(
+    val sessions: List<ChatSession> = emptyList(),
+    val activeSessionId: String? = null,
 )

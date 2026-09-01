@@ -25,14 +25,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,6 +42,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.SnackbarHost
@@ -47,12 +50,14 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,6 +74,7 @@ import com.nutritareas.app.data.template.TemplateDocument
 import com.nutritareas.app.ui.chat.components.ApiKeyMissingBanner
 import com.nutritareas.app.ui.chat.components.ApplyTemplateRow
 import com.nutritareas.app.ui.chat.components.ChatInputBar
+import com.nutritareas.app.ui.chat.components.ChatSessionDrawerContent
 import com.nutritareas.app.ui.chat.components.DocumentReadyRow
 import com.nutritareas.app.ui.chat.components.EditAssistantMessageDialog
 import com.nutritareas.app.ui.chat.components.EditingMessageRow
@@ -77,10 +83,12 @@ import com.nutritareas.app.ui.chat.components.MessageBubble
 import com.nutritareas.app.ui.chat.components.NutritionBackdrop
 import com.nutritareas.app.ui.chat.components.PdfChipsRow
 import com.nutritareas.app.ui.chat.components.PendingPdfRow
+import com.nutritareas.app.ui.chat.components.QuickReplyOptionsRow
 import com.nutritareas.app.ui.chat.components.RetryResponseRow
 import com.nutritareas.app.ui.chat.components.TemplateChip
 import com.nutritareas.app.ui.chat.components.TemplateDocPreviewDialog
 import com.nutritareas.app.ui.chat.components.TypingIndicatorBubble
+import kotlinx.coroutines.launch
 
 private const val DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
@@ -94,6 +102,8 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val drawerScope = rememberCoroutineScope()
 
     val pdfPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         viewModel.onAttachPdfPicked(uris)
@@ -154,24 +164,36 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         )
     }
 
-    if (uiState.showNewConversationConfirm) {
+    if (uiState.deleteSessionConfirmId != null) {
         AlertDialog(
-            onDismissRequest = viewModel::onDismissNewConversationConfirm,
-            title = { Text(stringResource(R.string.new_conversation_confirm_title)) },
-            text = { Text(stringResource(R.string.new_conversation_confirm_body)) },
+            onDismissRequest = viewModel::onDismissDeleteSessionConfirm,
+            title = { Text(stringResource(R.string.delete_conversation_confirm_title)) },
+            text = { Text(stringResource(R.string.delete_conversation_confirm_body)) },
             confirmButton = {
-                TextButton(onClick = viewModel::onConfirmNewConversation) {
-                    Text(stringResource(R.string.new_conversation))
+                TextButton(onClick = viewModel::onConfirmDeleteSession) {
+                    Text(stringResource(R.string.delete_conversation))
                 }
             },
             dismissButton = {
-                TextButton(onClick = viewModel::onDismissNewConversationConfirm) {
+                TextButton(onClick = viewModel::onDismissDeleteSessionConfirm) {
                     Text(stringResource(R.string.cancel))
                 }
             },
         )
     }
 
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ChatSessionDrawerContent(
+                sessions = uiState.sessionSummaries,
+                activeSessionId = uiState.activeSessionId,
+                onSelect = { id -> viewModel.onSelectSession(id); drawerScope.launch { drawerState.close() } },
+                onNewChat = { viewModel.onNewChatClick(); drawerScope.launch { drawerState.close() } },
+                onDeleteRequested = viewModel::onDeleteSessionRequested,
+            )
+        },
+    ) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -184,9 +206,14 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                         )
                     }
                 },
+                navigationIcon = {
+                    IconButton(onClick = { drawerScope.launch { drawerState.open() } }) {
+                        Icon(Icons.Filled.Menu, contentDescription = stringResource(R.string.cd_open_conversations))
+                    }
+                },
                 actions = {
-                    IconButton(onClick = viewModel::onNewConversationClick) {
-                        Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.new_conversation))
+                    IconButton(onClick = viewModel::onNewChatClick) {
+                        Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.new_conversation))
                     }
                     TemplateDocumentButton(
                         isSyncing = uiState.isSyncingTemplateDoc,
@@ -228,6 +255,12 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 }
                 if (uiState.isEditingMessage) {
                     EditingMessageRow(onCancel = viewModel::onCancelEditing)
+                }
+                if (uiState.quickReplyOptions.isNotEmpty()) {
+                    QuickReplyOptionsRow(
+                        options = uiState.quickReplyOptions,
+                        onSelect = viewModel::onQuickReplyOptionSelected,
+                    )
                 }
                 ChatInputBar(
                     text = uiState.inputText,
@@ -319,6 +352,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 }
             }
         }
+    }
     }
 }
 

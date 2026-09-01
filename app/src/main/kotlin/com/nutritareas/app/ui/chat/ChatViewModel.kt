@@ -18,12 +18,14 @@ import com.nutritareas.app.data.assistant.AssistantStreamEvent
 import com.nutritareas.app.data.assistant.GeminiAssistantClient
 import com.nutritareas.app.data.assistant.GeneratedImage
 import com.nutritareas.app.data.assistant.parseImageRequest
+import com.nutritareas.app.data.assistant.parseQuickReplyRequest
 import com.nutritareas.app.data.chat.ChatHistoryStore
 import com.nutritareas.app.data.chat.ChatImageAttachment
 import com.nutritareas.app.data.chat.ChatMessage
 import com.nutritareas.app.data.chat.ChatPdfAttachment
 import com.nutritareas.app.data.chat.ChatRole
 import com.nutritareas.app.data.chat.ChatSession
+import com.nutritareas.app.data.chat.ChatSessionsData
 import com.nutritareas.app.data.docx.DocxTemplate
 import com.nutritareas.app.data.docx.DocxTemplateException
 import com.nutritareas.app.data.docx.DocxTemplateReader
@@ -83,7 +85,26 @@ class ChatViewModel(
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
-    private var session: ChatSession = ChatSession()
+    // Every conversation she's keeping, and which one is on screen - [session] below is just a
+    // convenience view onto the active one, so the rest of the ViewModel (written long before
+    // multi-chat existed) can keep reading/writing "session" as if there were only ever one.
+    private var sessions: List<ChatSession> = emptyList()
+    private var activeSessionId: String = ""
+
+    private var session: ChatSession
+        get() = sessions.firstOrNull { it.id == activeSessionId } ?: ChatSession().also {
+            sessions = sessions + it
+            activeSessionId = it.id
+        }
+        set(value) {
+            sessions = if (sessions.any { it.id == value.id }) {
+                sessions.map { if (it.id == value.id) value else it }
+            } else {
+                sessions + value
+            }
+            activeSessionId = value.id
+        }
+
     private var currentSettings: AppSettings = AppSettings()
     private var readyDocumentFile: File? = null
     private var readyImageFile: File? = null
@@ -92,17 +113,15 @@ class ChatViewModel(
 
     init {
         viewModelScope.launch {
-            session = chatHistoryStore.load()
-            val seededGreeting = seedGreetingIfNeeded()
-            if (seededGreeting) persistSession()
-            _uiState.update {
-                it.copy(
-                    messages = session.messages,
-                    pdfAttachments = session.pdfAttachments.toSummaries(),
-                    templateFileName = session.templateFileName,
-                    templateParagraphCount = session.templateParagraphs.size,
-                )
-            }
+            val data = chatHistoryStore.load()
+            sessions = data.sessions
+            activeSessionId = data.activeSessionId?.takeIf { id -> data.sessions.any { it.id == id } }
+                ?: data.sessions.firstOrNull()?.id ?: ""
+            seedGreetingIfNeeded()
+            // Always writes chat_sessions.json, even when nothing changed - the only way a
+            // pre-multi-chat install's legacy chat_session.json actually gets migrated to it.
+            persistSession()
+            refreshUiFromSession()
         }
         viewModelScope.launch {
             settingsRepository.settings.collectLatest { settings ->
@@ -122,6 +141,115 @@ class ChatViewModel(
         )
         session = session.copy(messages = listOf(greeting))
         return true
+    }
+
+    /** Refreshes every part of [ChatUiState] derived from [session]/[sessions] - used on load and
+     *  whenever which conversation is active changes (new chat, switch, delete). */
+    private fun refreshUiFromSession() {
+        _uiState.update {
+            it.copy(
+                messages = session.messages,
+                sessionSummaries = sessions.toSummaries(),
+                activeSessionId = activeSessionId,
+                pdfAttachments = session.pdfAttachments.toSummaries(),
+                pendingPdfAttachments = emptyList(),
+                templateFileName = session.templateFileName,
+                templateParagraphCount = session.templateParagraphs.size,
+                inputText = "",
+                editingMessageId = null,
+                editingAssistantMessageId = null,
+                editingAssistantMessageText = "",
+                quickReplyOptions = emptyList(),
+                readyDocumentUri = null,
+                readyDocumentFileName = null,
+                readyImageUri = null,
+                readyImageFileName = null,
+                isAssistantResponding = false,
+                streamingText = "",
+            )
+        }
+    }
+
+    /** One row per conversation for the drawer, most recently active first. [ChatSessionSummary.title]
+     *  is her first message in it, so she can tell her conversations apart at a glance. */
+    private fun List<ChatSession>.toSummaries(): List<ChatSessionSummary> {
+        val app = getApplication<Application>()
+        return sortedByDescending { it.messages.lastOrNull()?.timestampEpochMillis ?: 0L }
+            .map { s ->
+                val firstUserText = s.messages.firstOrNull { it.role == ChatRole.USER }?.text?.trim()
+                val title = firstUserText?.takeIf { it.isNotEmpty() }
+                    ?.let { if (it.length > 40) it.take(40) + "…" else it }
+                    ?: app.getString(R.string.new_conversation)
+                ChatSessionSummary(
+                    id = s.id,
+                    title = title,
+                    updatedAtEpochMillis = s.messages.lastOrNull()?.timestampEpochMillis ?: 0L,
+                )
+            }
+    }
+
+    /** Starts a brand-new conversation and switches to it - the old ones stay in [sessions], picked
+     *  from the drawer (see [onSelectSession]). Blocked mid-reply, same as switching or deleting one. */
+    fun onNewChatClick() {
+        if (_uiState.value.isAssistantResponding) return
+        pendingPdfs = emptyList()
+        readyDocumentFile = null
+        readyImageFile = null
+        val fresh = ChatSession()
+        sessions = sessions + fresh
+        activeSessionId = fresh.id
+        seedGreetingIfNeeded()
+        persistSession()
+        refreshUiFromSession()
+    }
+
+    /** Switches which conversation is on screen - see [onNewChatClick] for why this is blocked mid-reply. */
+    fun onSelectSession(sessionId: String) {
+        if (_uiState.value.isAssistantResponding) return
+        if (sessionId == activeSessionId) return
+        if (sessions.none { it.id == sessionId }) return
+        pendingPdfs = emptyList()
+        readyDocumentFile = null
+        readyImageFile = null
+        activeSessionId = sessionId
+        persistSession()
+        refreshUiFromSession()
+    }
+
+    fun onDeleteSessionRequested(sessionId: String) {
+        if (sessionId == activeSessionId && _uiState.value.isAssistantResponding) return
+        _uiState.update { it.copy(deleteSessionConfirmId = sessionId) }
+    }
+
+    fun onDismissDeleteSessionConfirm() {
+        _uiState.update { it.copy(deleteSessionConfirmId = null) }
+    }
+
+    /** Deletes the requested conversation. If it was the one on screen, whichever conversation she
+     *  last touched takes its place, or a fresh one if that was her last conversation. */
+    fun onConfirmDeleteSession() {
+        val sessionId = _uiState.value.deleteSessionConfirmId ?: return
+        _uiState.update { it.copy(deleteSessionConfirmId = null) }
+        sessions = sessions.filterNot { it.id == sessionId }
+        if (sessionId != activeSessionId) {
+            persistSession()
+            _uiState.update { it.copy(sessionSummaries = sessions.toSummaries()) }
+            return
+        }
+        pendingPdfs = emptyList()
+        readyDocumentFile = null
+        readyImageFile = null
+        val next = sessions.maxByOrNull { it.messages.lastOrNull()?.timestampEpochMillis ?: 0L }
+        if (next != null) {
+            activeSessionId = next.id
+        } else {
+            val fresh = ChatSession()
+            sessions = listOf(fresh)
+            activeSessionId = fresh.id
+            seedGreetingIfNeeded()
+        }
+        persistSession()
+        refreshUiFromSession()
     }
 
     fun onInputChange(text: String) {
@@ -232,6 +360,13 @@ class ChatViewModel(
         _uiState.update {
             it.copy(messages = session.messages, editingAssistantMessageId = null, editingAssistantMessageText = "")
         }
+    }
+
+    /** Tapping one of Paco's suggested next steps (see [parseQuickReplyRequest]) sends it exactly
+     *  like typing it herself - the options are just a shortcut, never her only way to reply. */
+    fun onQuickReplyOptionSelected(option: String) {
+        if (_uiState.value.isAssistantResponding) return
+        sendTurn(option)
     }
 
     /**
@@ -405,33 +540,6 @@ class ChatViewModel(
         }
     }
 
-    fun onNewConversationClick() {
-        _uiState.update { it.copy(showNewConversationConfirm = true) }
-    }
-
-    fun onDismissNewConversationConfirm() {
-        _uiState.update { it.copy(showNewConversationConfirm = false) }
-    }
-
-    fun onConfirmNewConversation() {
-        readyDocumentFile = null
-        readyImageFile = null
-        pendingPdfs = emptyList()
-        templatePreviewJob?.cancel()
-        templatePreviewJob = null
-        viewModelScope.launch {
-            chatHistoryStore.clear()
-            session = ChatSession()
-            seedGreetingIfNeeded()
-            persistSession()
-            _uiState.value = ChatUiState(
-                messages = session.messages,
-                hasApiKey = currentSettings.hasActiveApiKey,
-                activeProvider = currentSettings.activeProvider,
-            )
-        }
-    }
-
     fun onErrorMessageShown() {
         _uiState.update { it.copy(errorMessage = null) }
     }
@@ -502,7 +610,13 @@ class ChatViewModel(
         session = session.copy(messages = session.messages + userMessage)
         persistSession()
         _uiState.update {
-            it.copy(messages = session.messages, isAssistantResponding = true, streamingText = "", errorMessage = null)
+            it.copy(
+                messages = session.messages,
+                isAssistantResponding = true,
+                streamingText = "",
+                errorMessage = null,
+                quickReplyOptions = emptyList(),
+            )
         }
 
         val client = assistantClientForActiveProvider()
@@ -557,15 +671,29 @@ class ChatViewModel(
 
                 is AssistantStreamEvent.Completed -> {
                     val imageRequest = parseImageRequest(event.fullText)
-                    if (imageRequest != null) {
-                        val app = getApplication<Application>()
-                        val caption = imageRequest.visibleText.ifBlank { app.getString(R.string.image_generating_caption) }
-                        appendAssistantMessage(caption, isError = false)
-                        generateImage(imageRequest.prompt)
-                    } else {
-                        appendAssistantMessage(event.fullText, isError = false)
-                        if (isTemplateApplication) applyTemplateEdits(event.fullText)
-                        if (isGoogleDocSync) applyGoogleDocEdits(event.fullText)
+                    when {
+                        imageRequest != null -> {
+                            val app = getApplication<Application>()
+                            val caption = imageRequest.visibleText.ifBlank { app.getString(R.string.image_generating_caption) }
+                            appendAssistantMessage(caption, isError = false)
+                            generateImage(imageRequest.prompt)
+                        }
+                        isTemplateApplication || isGoogleDocSync -> {
+                            appendAssistantMessage(event.fullText, isError = false)
+                            if (isTemplateApplication) applyTemplateEdits(event.fullText)
+                            if (isGoogleDocSync) applyGoogleDocEdits(event.fullText)
+                        }
+                        else -> {
+                            // A normal conversational reply can end with [[OPCIONES]] offering a
+                            // couple of short next steps - see AssistantPersona and QuickReplyParser.
+                            val quickReply = parseQuickReplyRequest(event.fullText)
+                            if (quickReply != null) {
+                                appendAssistantMessage(quickReply.visibleText, isError = false)
+                                _uiState.update { it.copy(quickReplyOptions = quickReply.options) }
+                            } else {
+                                appendAssistantMessage(event.fullText, isError = false)
+                            }
+                        }
                     }
                 }
 
@@ -573,7 +701,7 @@ class ChatViewModel(
                     val isTransient = event.error is AssistantError.ServerError || event.error is AssistantError.Network
                     if (isTransient && attempt < MAX_TRANSIENT_RETRIES) {
                         _uiState.update { it.copy(streamingText = "") }
-                        delay(TRANSIENT_RETRY_DELAY_MS * (attempt + 1))
+                        delay(transientRetryDelayMs(attempt))
                         runAssistantTurn(
                             client, apiKey, modelId, history, requestText, images,
                             isTemplateApplication, isGoogleDocSync, attempt + 1,
@@ -751,14 +879,21 @@ class ChatViewModel(
     }
 
     private fun persistSession() {
-        val snapshot = session
+        val snapshot = ChatSessionsData(sessions = sessions, activeSessionId = activeSessionId)
         viewModelScope.launch { chatHistoryStore.save(snapshot) }
     }
 
+    /** Exponential backoff for [runAssistantTurn]'s retries, capped so a long spike (Gemini's "high
+     *  demand" 503 can run well past the couple of seconds the old fixed short delay allowed for)
+     *  doesn't leave her waiting forever either. */
+    private fun transientRetryDelayMs(attempt: Int): Long =
+        (TRANSIENT_RETRY_BASE_DELAY_MS * (1L shl attempt)).coerceAtMost(TRANSIENT_RETRY_MAX_DELAY_MS)
+
     companion object {
         private const val TEMPLATE_PREVIEW_POLL_INTERVAL_MS = 4000L
-        private const val MAX_TRANSIENT_RETRIES = 2
-        private const val TRANSIENT_RETRY_DELAY_MS = 1200L
+        private const val MAX_TRANSIENT_RETRIES = 4
+        private const val TRANSIENT_RETRY_BASE_DELAY_MS = 1500L
+        private const val TRANSIENT_RETRY_MAX_DELAY_MS = 10_000L
 
         fun factory(application: Application): ViewModelProvider.Factory {
             val container = (application as NutriTareasApp).container

@@ -151,6 +151,23 @@ fun RetryResponseRow(onClick: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
+/** Shown above the input bar when Paco offers a short multiple-choice next step (the
+ *  `[[OPCIONES]]` marker - see AssistantPersona and QuickReplyParser). Tapping one sends it just
+ *  like typing it herself; she can also ignore them and type her own instruction instead. */
+@Composable
+fun QuickReplyOptionsRow(options: List<String>, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
+    LazyRow(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(options) { option ->
+            OutlinedButton(onClick = { onSelect(option) }) {
+                Text(option, style = MaterialTheme.typography.labelLarge)
+            }
+        }
+    }
+}
+
 @Composable
 fun TemplateChip(fileName: String, paragraphCount: Int, modifier: Modifier = Modifier) {
     Surface(

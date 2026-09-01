@@ -10,8 +10,14 @@ import com.nutritareas.app.data.template.TemplateParagraph
  *  payload stays out of UI state, which only needs to show what's there and let her remove it. */
 data class PdfSummary(val id: String, val fileName: String, val pageCount: Int)
 
+/** One row in the conversations drawer - the full message list stays out of UI state until she
+ *  actually opens that conversation (see [com.nutritareas.app.ui.chat.ChatViewModel.onSelectSession]). */
+data class ChatSessionSummary(val id: String, val title: String, val updatedAtEpochMillis: Long)
+
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
+    val sessionSummaries: List<ChatSessionSummary> = emptyList(),
+    val activeSessionId: String = "",
     val pdfAttachments: List<PdfSummary> = emptyList(),
     val pendingPdfAttachments: List<PdfSummary> = emptyList(),
     val inputText: String = "",
@@ -36,9 +42,10 @@ data class ChatUiState(
     val editingMessageId: String? = null,
     val editingAssistantMessageId: String? = null,
     val editingAssistantMessageText: String = "",
+    val quickReplyOptions: List<String> = emptyList(),
     val errorMessage: String? = null,
     val infoMessage: String? = null,
-    val showNewConversationConfirm: Boolean = false,
+    val deleteSessionConfirmId: String? = null,
     val hasApiKey: Boolean = true,
     val activeProvider: AssistantProvider = AssistantProvider.CLAUDE,
 ) {
