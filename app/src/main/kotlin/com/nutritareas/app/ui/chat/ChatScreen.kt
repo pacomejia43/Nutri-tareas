@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Settings
@@ -72,6 +73,7 @@ import com.nutritareas.app.data.chat.ChatRole
 import com.nutritareas.app.data.settings.AssistantProvider
 import com.nutritareas.app.data.template.TemplateDocument
 import com.nutritareas.app.ui.chat.components.ApiKeyMissingBanner
+import com.nutritareas.app.ui.chat.components.AppInfoDialog
 import com.nutritareas.app.ui.chat.components.ApplyTemplateRow
 import com.nutritareas.app.ui.chat.components.ChatInputBar
 import com.nutritareas.app.ui.chat.components.ChatSessionDrawerContent
@@ -164,6 +166,10 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         )
     }
 
+    if (uiState.isAppInfoOpen) {
+        AppInfoDialog(onDismiss = viewModel::onCloseAppInfo)
+    }
+
     if (uiState.deleteSessionConfirmId != null) {
         AlertDialog(
             onDismissRequest = viewModel::onDismissDeleteSessionConfirm,
@@ -221,6 +227,9 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                         onOpenPreview = viewModel::onOpenTemplatePreviewClick,
                         onSyncFromChat = viewModel::onSyncTemplateDocClick,
                     )
+                    IconButton(onClick = viewModel::onOpenAppInfo) {
+                        Icon(Icons.Filled.Info, contentDescription = stringResource(R.string.cd_open_app_info))
+                    }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.cd_settings))
                     }

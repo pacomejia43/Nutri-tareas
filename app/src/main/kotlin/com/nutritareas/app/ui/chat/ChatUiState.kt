@@ -46,6 +46,7 @@ data class ChatUiState(
     val errorMessage: String? = null,
     val infoMessage: String? = null,
     val deleteSessionConfirmId: String? = null,
+    val isAppInfoOpen: Boolean = false,
     val hasApiKey: Boolean = true,
     val activeProvider: AssistantProvider = AssistantProvider.CLAUDE,
 ) {

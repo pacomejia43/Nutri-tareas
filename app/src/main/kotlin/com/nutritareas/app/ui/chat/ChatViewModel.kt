@@ -188,10 +188,21 @@ class ChatViewModel(
             }
     }
 
-    /** Starts a brand-new conversation and switches to it - the old ones stay in [sessions], picked
-     *  from the drawer (see [onSelectSession]). Blocked mid-reply, same as switching or deleting one. */
+    /**
+     * Starts a brand-new conversation and switches to it - the old ones stay in [sessions], picked
+     * from the drawer (see [onSelectSession]). Blocked mid-reply, same as switching or deleting one.
+     * When the conversation on screen is already empty (she hasn't sent anything in it yet), there's
+     * nothing to start over from, so this just tells her instead of piling up empty duplicates -
+     * without this she could tap "+" repeatedly and see what looks like nothing happening, since a
+     * second blank conversation looks identical to the first.
+     */
     fun onNewChatClick() {
         if (_uiState.value.isAssistantResponding) return
+        val app = getApplication<Application>()
+        if (session.messages.none { it.role == ChatRole.USER }) {
+            _uiState.update { it.copy(infoMessage = app.getString(R.string.already_new_conversation)) }
+            return
+        }
         pendingPdfs = emptyList()
         readyDocumentFile = null
         readyImageFile = null
@@ -201,6 +212,15 @@ class ChatViewModel(
         seedGreetingIfNeeded()
         persistSession()
         refreshUiFromSession()
+        _uiState.update { it.copy(infoMessage = app.getString(R.string.new_conversation_started)) }
+    }
+
+    fun onOpenAppInfo() {
+        _uiState.update { it.copy(isAppInfoOpen = true) }
+    }
+
+    fun onCloseAppInfo() {
+        _uiState.update { it.copy(isAppInfoOpen = false) }
     }
 
     /** Switches which conversation is on screen - see [onNewChatClick] for why this is blocked mid-reply. */
