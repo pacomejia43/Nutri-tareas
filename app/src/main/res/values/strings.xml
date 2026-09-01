@@ -82,15 +82,6 @@
     <string name="gemini_api_key_hint">Se guarda cifrada en este dispositivo. Consíguela gratis en aistudio.google.com</string>
     <string name="api_key_saved">Clave guardada</string>
     <string name="api_key_clear">Quitar clave</string>
-    <string name="model_label">Modelo</string>
-    <string name="model_opus">Claude Opus 5 (más capaz)</string>
-    <string name="model_sonnet">Claude Sonnet 5 (equilibrado)</string>
-    <string name="model_haiku">Claude Haiku 4.5 (más económico)</string>
-    <string name="model_gemini_pro">Gemini Pro (más capaz)</string>
-    <string name="model_gemini_flash">Gemini Flash (equilibrado)</string>
-    <string name="model_gemini_flash_lite">Gemini Flash-Lite (más económico)</string>
-    <string name="model_custom">Personalizado</string>
-    <string name="model_custom_label">ID del modelo</string>
     <string name="template_web_app_section_title">Plantilla de Google Docs</string>
     <string name="template_web_app_section_hint">Pega aquí la URL de la \"aplicación web\" que publicaste desde el Apps Script del documento, para que Paco pueda leerlo y editarlo directamente.</string>
     <string name="template_web_app_placeholder">https://script.google.com/macros/s/…/exec</string>

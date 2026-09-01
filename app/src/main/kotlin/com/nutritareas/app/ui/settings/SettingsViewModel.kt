@@ -29,27 +29,13 @@ class SettingsViewModel(
     init {
         viewModelScope.launch {
             settingsRepository.settings.collectLatest { settings ->
-                val claudeOption = ClaudeModelOption.fromModelId(settings.claudeModelId)
-                val geminiOption = GeminiModelOption.fromModelId(settings.geminiModelId)
                 _uiState.update {
                     it.copy(
                         activeProvider = settings.activeProvider,
                         hasStoredClaudeKey = settings.hasClaudeApiKey,
                         isEditingClaudeKey = it.isEditingClaudeKey && !settings.hasClaudeApiKey,
-                        selectedClaudeModelOption = claudeOption,
-                        customClaudeModelId = if (claudeOption == ClaudeModelOption.CUSTOM) {
-                            settings.claudeModelId
-                        } else {
-                            it.customClaudeModelId
-                        },
                         hasStoredGeminiKey = settings.hasGeminiApiKey,
                         isEditingGeminiKey = it.isEditingGeminiKey && !settings.hasGeminiApiKey,
-                        selectedGeminiModelOption = geminiOption,
-                        customGeminiModelId = if (geminiOption == GeminiModelOption.CUSTOM) {
-                            settings.geminiModelId
-                        } else {
-                            it.customGeminiModelId
-                        },
                         hasStoredTemplateWebAppUrl = settings.hasTemplateWebAppUrl,
                         isEditingTemplateWebAppUrl = it.isEditingTemplateWebAppUrl && !settings.hasTemplateWebAppUrl,
                     )
@@ -95,18 +81,6 @@ class SettingsViewModel(
         }
     }
 
-    fun onClaudeModelOptionSelected(option: ClaudeModelOption) {
-        _uiState.update { it.copy(selectedClaudeModelOption = option) }
-        if (option != ClaudeModelOption.CUSTOM) {
-            viewModelScope.launch { settingsRepository.saveClaudeModelId(requireNotNull(option.modelId)) }
-        }
-    }
-
-    fun onCustomClaudeModelIdChange(value: String) {
-        _uiState.update { it.copy(customClaudeModelId = value) }
-        if (value.isNotBlank()) viewModelScope.launch { settingsRepository.saveClaudeModelId(value.trim()) }
-    }
-
     // --- Gemini ---
 
     fun onGeminiKeyInputChange(value: String) {
@@ -138,18 +112,6 @@ class SettingsViewModel(
             settingsRepository.clearGeminiApiKey()
             _uiState.update { it.copy(isEditingGeminiKey = true, geminiKeyInput = "") }
         }
-    }
-
-    fun onGeminiModelOptionSelected(option: GeminiModelOption) {
-        _uiState.update { it.copy(selectedGeminiModelOption = option) }
-        if (option != GeminiModelOption.CUSTOM) {
-            viewModelScope.launch { settingsRepository.saveGeminiModelId(requireNotNull(option.modelId)) }
-        }
-    }
-
-    fun onCustomGeminiModelIdChange(value: String) {
-        _uiState.update { it.copy(customGeminiModelId = value) }
-        if (value.isNotBlank()) viewModelScope.launch { settingsRepository.saveGeminiModelId(value.trim()) }
     }
 
     // --- Template Google Doc (Apps Script Web App URL) ---

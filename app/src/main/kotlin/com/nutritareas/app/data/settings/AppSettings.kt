@@ -3,9 +3,7 @@ package com.nutritareas.app.data.settings
 data class AppSettings(
     val activeProvider: AssistantProvider = AssistantProvider.CLAUDE,
     val claudeApiKey: String? = null,
-    val claudeModelId: String = DEFAULT_CLAUDE_MODEL_ID,
     val geminiApiKey: String? = null,
-    val geminiModelId: String = DEFAULT_GEMINI_MODEL_ID,
     val lastSeenReleaseTag: String? = null,
     val templateWebAppUrl: String? = null,
 ) {
@@ -20,16 +18,20 @@ data class AppSettings(
             AssistantProvider.GEMINI -> geminiApiKey
         }
 
+    /** Not user-configurable - picking between model tiers was pure margin for error for a single
+     *  non-technical user, so each provider is pinned to the model that best balances quality and
+     *  speed for a homework-helper chat: Sonnet over Opus/Haiku for Claude, Flash over Pro/Flash-Lite
+     *  for Gemini. */
     val activeModelId: String
         get() = when (activeProvider) {
-            AssistantProvider.CLAUDE -> claudeModelId
-            AssistantProvider.GEMINI -> geminiModelId
+            AssistantProvider.CLAUDE -> CLAUDE_MODEL_ID
+            AssistantProvider.GEMINI -> GEMINI_MODEL_ID
         }
 
     val hasActiveApiKey: Boolean get() = !activeApiKey.isNullOrBlank()
 
     companion object {
-        const val DEFAULT_CLAUDE_MODEL_ID = "claude-opus-5"
-        const val DEFAULT_GEMINI_MODEL_ID = "gemini-pro-latest"
+        const val CLAUDE_MODEL_ID = "claude-sonnet-5"
+        const val GEMINI_MODEL_ID = "gemini-flash-latest"
     }
 }

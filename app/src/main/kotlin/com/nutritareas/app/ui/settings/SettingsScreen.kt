@@ -22,7 +22,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -122,36 +121,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                 placeholder = stringResource(R.string.claude_api_key_placeholder),
                 hint = stringResource(R.string.claude_api_key_hint),
             )
-            Spacer(Modifier.height(16.dp))
-            Text(stringResource(R.string.model_label), style = MaterialTheme.typography.titleSmall)
-            ModelOptionsColumn(
-                options = listOf(
-                    ModelRadioItem(
-                        label = stringResource(R.string.model_opus),
-                        selected = uiState.selectedClaudeModelOption == ClaudeModelOption.OPUS,
-                        onClick = { viewModel.onClaudeModelOptionSelected(ClaudeModelOption.OPUS) },
-                    ),
-                    ModelRadioItem(
-                        label = stringResource(R.string.model_sonnet),
-                        selected = uiState.selectedClaudeModelOption == ClaudeModelOption.SONNET,
-                        onClick = { viewModel.onClaudeModelOptionSelected(ClaudeModelOption.SONNET) },
-                    ),
-                    ModelRadioItem(
-                        label = stringResource(R.string.model_haiku),
-                        selected = uiState.selectedClaudeModelOption == ClaudeModelOption.HAIKU,
-                        onClick = { viewModel.onClaudeModelOptionSelected(ClaudeModelOption.HAIKU) },
-                    ),
-                    ModelRadioItem(
-                        label = stringResource(R.string.model_custom),
-                        selected = uiState.selectedClaudeModelOption == ClaudeModelOption.CUSTOM,
-                        onClick = { viewModel.onClaudeModelOptionSelected(ClaudeModelOption.CUSTOM) },
-                    ),
-                ),
-                showCustomField = uiState.selectedClaudeModelOption == ClaudeModelOption.CUSTOM,
-                customModelId = uiState.customClaudeModelId,
-                onCustomModelIdChange = viewModel::onCustomClaudeModelIdChange,
-                customFieldLabel = stringResource(R.string.model_custom_label),
-            )
 
             Spacer(Modifier.height(24.dp))
             HorizontalDivider()
@@ -169,36 +138,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                 onClear = viewModel::onClearGeminiKey,
                 placeholder = stringResource(R.string.gemini_api_key_placeholder),
                 hint = stringResource(R.string.gemini_api_key_hint),
-            )
-            Spacer(Modifier.height(16.dp))
-            Text(stringResource(R.string.model_label), style = MaterialTheme.typography.titleSmall)
-            ModelOptionsColumn(
-                options = listOf(
-                    ModelRadioItem(
-                        label = stringResource(R.string.model_gemini_pro),
-                        selected = uiState.selectedGeminiModelOption == GeminiModelOption.PRO,
-                        onClick = { viewModel.onGeminiModelOptionSelected(GeminiModelOption.PRO) },
-                    ),
-                    ModelRadioItem(
-                        label = stringResource(R.string.model_gemini_flash),
-                        selected = uiState.selectedGeminiModelOption == GeminiModelOption.FLASH,
-                        onClick = { viewModel.onGeminiModelOptionSelected(GeminiModelOption.FLASH) },
-                    ),
-                    ModelRadioItem(
-                        label = stringResource(R.string.model_gemini_flash_lite),
-                        selected = uiState.selectedGeminiModelOption == GeminiModelOption.FLASH_LITE,
-                        onClick = { viewModel.onGeminiModelOptionSelected(GeminiModelOption.FLASH_LITE) },
-                    ),
-                    ModelRadioItem(
-                        label = stringResource(R.string.model_custom),
-                        selected = uiState.selectedGeminiModelOption == GeminiModelOption.CUSTOM,
-                        onClick = { viewModel.onGeminiModelOptionSelected(GeminiModelOption.CUSTOM) },
-                    ),
-                ),
-                showCustomField = uiState.selectedGeminiModelOption == GeminiModelOption.CUSTOM,
-                customModelId = uiState.customGeminiModelId,
-                onCustomModelIdChange = viewModel::onCustomGeminiModelIdChange,
-                customFieldLabel = stringResource(R.string.model_custom_label),
             )
 
             Spacer(Modifier.height(24.dp))
@@ -343,39 +282,5 @@ private fun ApiKeySection(
             TextButton(onClick = onStartEditing) { Text(stringResource(R.string.save)) }
             TextButton(onClick = onClear) { Text(clearLabel) }
         }
-    }
-}
-
-private data class ModelRadioItem(val label: String, val selected: Boolean, val onClick: () -> Unit)
-
-@Composable
-private fun ModelOptionsColumn(
-    options: List<ModelRadioItem>,
-    showCustomField: Boolean,
-    customModelId: String,
-    onCustomModelIdChange: (String) -> Unit,
-    customFieldLabel: String,
-) {
-    Column(modifier = Modifier.padding(top = 8.dp)) {
-        options.forEach { item ->
-            ModelRadioOption(label = item.label, selected = item.selected, onClick = item.onClick)
-        }
-        if (showCustomField) {
-            OutlinedTextField(
-                value = customModelId,
-                onValueChange = onCustomModelIdChange,
-                modifier = Modifier.fillMaxWidth().padding(start = 32.dp, top = 4.dp),
-                label = { Text(customFieldLabel) },
-                singleLine = true,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ModelRadioOption(label: String, selected: Boolean, onClick: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        RadioButton(selected = selected, onClick = onClick)
-        Text(label)
     }
 }

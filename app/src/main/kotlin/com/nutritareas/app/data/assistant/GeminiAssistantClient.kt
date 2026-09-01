@@ -217,8 +217,8 @@ class GeminiAssistantClient : AssistantClient {
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
         /** Google's current Gemini image-generation model ("Nano Banana" family). Independent of
-         *  [com.nutritareas.app.data.settings.AppSettings.geminiModelId], which only picks the text
-         *  chat model - update this if Google renames or retires it. */
+         *  [com.nutritareas.app.data.settings.AppSettings.GEMINI_MODEL_ID], which is only for text
+         *  chat - update this if Google renames or retires it. */
         const val IMAGE_MODEL_ID = "gemini-2.5-flash-image"
 
         /** Extracts the payload from an SSE `data: {...}` line, or null for any other SSE line (comments, blanks, other fields). */
