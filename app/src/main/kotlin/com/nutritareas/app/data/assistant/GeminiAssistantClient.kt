@@ -42,7 +42,10 @@ class GeminiAssistantClient : AssistantClient {
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(180, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
+        // Uploading a turn with one or more attached PDFs as base64 can take a while on mobile
+        // data - 60s was too tight and turned a merely-slow upload into a SocketTimeoutException,
+        // shown to her as a misleading "no hay conexión a internet" even though she was online.
+        .writeTimeout(180, TimeUnit.SECONDS)
         .build()
 
     override fun streamTurn(

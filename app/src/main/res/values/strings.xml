@@ -41,6 +41,8 @@
     <string name="new_conversation_confirm_body">Se borrará la conversación actual en este dispositivo. El documento que ya generaste y guardaste no se verá afectado.</string>
     <string name="edit_message">Editar</string>
     <string name="editing_message_banner">Editando tu último mensaje</string>
+    <string name="edit_assistant_message_title">Editar respuesta de Paco</string>
+    <string name="retry_response">Reintentar</string>
     <string name="image_ready">Imagen generada</string>
     <string name="image_generating_caption">Aquí tienes:</string>
 

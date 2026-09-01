@@ -2,6 +2,7 @@ package com.nutritareas.app.ui.chat
 
 import android.net.Uri
 import com.nutritareas.app.data.chat.ChatMessage
+import com.nutritareas.app.data.chat.ChatRole
 import com.nutritareas.app.data.settings.AssistantProvider
 import com.nutritareas.app.data.template.TemplateParagraph
 
@@ -33,6 +34,8 @@ data class ChatUiState(
     val readyImageUri: Uri? = null,
     val readyImageFileName: String? = null,
     val editingMessageId: String? = null,
+    val editingAssistantMessageId: String? = null,
+    val editingAssistantMessageText: String = "",
     val errorMessage: String? = null,
     val infoMessage: String? = null,
     val showNewConversationConfirm: Boolean = false,
@@ -43,6 +46,8 @@ data class ChatUiState(
     val hasPendingPdf: Boolean get() = pendingPdfAttachments.isNotEmpty()
     val hasTemplate: Boolean get() = templateFileName != null
     val isEditingMessage: Boolean get() = editingMessageId != null
+    val isEditingAssistantMessage: Boolean get() = editingAssistantMessageId != null
+    val canRetryLastResponse: Boolean get() = !isAssistantResponding && messages.lastOrNull()?.role == ChatRole.ASSISTANT
     val canSend: Boolean get() = !isAssistantResponding && (inputText.isNotBlank() || hasPendingPdf)
     val canAttachPdf: Boolean get() = !isAssistantResponding && !isLoadingPdf
     val canAttachImages: Boolean get() = !isAssistantResponding && !isLoadingImages

@@ -192,6 +192,49 @@ class ChatViewModel(
     }
 
     /**
+     * "Reintentar": drops Paco's last reply and asks him again with the exact same last message
+     * she sent - for when his answer was wrong rather than her question. Only available once he's
+     * actually replied (the last message in the conversation is his).
+     */
+    fun onRetryLastResponse() {
+        if (_uiState.value.isAssistantResponding) return
+        if (session.messages.lastOrNull()?.role != ChatRole.ASSISTANT) return
+        val lastUserMessage = session.messages.lastOrNull { it.role == ChatRole.USER } ?: return
+        resendEditedMessage(lastUserMessage.id, lastUserMessage.text)
+    }
+
+    /**
+     * Long-pressing Paco's last reply loads it into the edit dialog (see [onSaveAssistantMessageEdit])
+     * so she can correct wrong information herself, in place - unlike [onRetryLastResponse], this
+     * doesn't ask the model again, it just fixes what's already there.
+     */
+    fun onEditAssistantMessageRequested(messageId: String) {
+        if (_uiState.value.isAssistantResponding) return
+        val message = session.messages.lastOrNull { it.role == ChatRole.ASSISTANT } ?: return
+        if (message.id != messageId) return
+        _uiState.update { it.copy(editingAssistantMessageId = messageId, editingAssistantMessageText = message.text) }
+    }
+
+    fun onAssistantMessageEditTextChange(text: String) {
+        _uiState.update { it.copy(editingAssistantMessageText = text) }
+    }
+
+    fun onCancelAssistantMessageEdit() {
+        _uiState.update { it.copy(editingAssistantMessageId = null, editingAssistantMessageText = "") }
+    }
+
+    fun onSaveAssistantMessageEdit() {
+        val id = _uiState.value.editingAssistantMessageId ?: return
+        val newText = _uiState.value.editingAssistantMessageText.trim()
+        if (newText.isEmpty()) return
+        session = session.copy(messages = session.messages.map { if (it.id == id) it.copy(text = newText) else it })
+        persistSession()
+        _uiState.update {
+            it.copy(messages = session.messages, editingAssistantMessageId = null, editingAssistantMessageText = "")
+        }
+    }
+
+    /**
      * Just stages the PDF(s) - not sent until she taps send (see [onSendClick]), so she can add
      * context first. Can be called again to add more, even with PDFs already pending or already
      * attached to the session - there's no cap on how many she can bring into one conversation.
@@ -480,10 +523,13 @@ class ChatViewModel(
     }
 
     /**
-     * Streams one assistant turn. A transient server-side failure (Claude/Gemini returning 5xx -
-     * e.g. Gemini's "the model is currently experiencing high demand") is retried silently up to
+     * Streams one assistant turn. A transient failure - Claude/Gemini returning 5xx (e.g. Gemini's
+     * "the model is currently experiencing high demand"), or a network hiccup/timeout (e.g. a slow
+     * mobile upload of a large PDF that outran the write timeout) - is retried silently up to
      * [MAX_TRANSIENT_RETRIES] times with backoff before it's shown as an error bubble, since these
-     * clear up on their own within a few seconds almost every time.
+     * clear up on their own within a few seconds almost every time. Without this, a merely-slow
+     * connection surfaced as a scary (and misleading) "no hay conexión a internet" on the very
+     * first hiccup.
      */
     private suspend fun runAssistantTurn(
         client: AssistantClient,
@@ -524,7 +570,8 @@ class ChatViewModel(
                 }
 
                 is AssistantStreamEvent.Failed -> {
-                    if (event.error is AssistantError.ServerError && attempt < MAX_TRANSIENT_RETRIES) {
+                    val isTransient = event.error is AssistantError.ServerError || event.error is AssistantError.Network
+                    if (isTransient && attempt < MAX_TRANSIENT_RETRIES) {
                         _uiState.update { it.copy(streamingText = "") }
                         delay(TRANSIENT_RETRY_DELAY_MS * (attempt + 1))
                         runAssistantTurn(

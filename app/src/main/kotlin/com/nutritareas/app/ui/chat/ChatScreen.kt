@@ -70,12 +70,14 @@ import com.nutritareas.app.ui.chat.components.ApiKeyMissingBanner
 import com.nutritareas.app.ui.chat.components.ApplyTemplateRow
 import com.nutritareas.app.ui.chat.components.ChatInputBar
 import com.nutritareas.app.ui.chat.components.DocumentReadyRow
+import com.nutritareas.app.ui.chat.components.EditAssistantMessageDialog
 import com.nutritareas.app.ui.chat.components.EditingMessageRow
 import com.nutritareas.app.ui.chat.components.ImageReadyRow
 import com.nutritareas.app.ui.chat.components.MessageBubble
 import com.nutritareas.app.ui.chat.components.NutritionBackdrop
 import com.nutritareas.app.ui.chat.components.PdfChipsRow
 import com.nutritareas.app.ui.chat.components.PendingPdfRow
+import com.nutritareas.app.ui.chat.components.RetryResponseRow
 import com.nutritareas.app.ui.chat.components.TemplateChip
 import com.nutritareas.app.ui.chat.components.TemplateDocPreviewDialog
 import com.nutritareas.app.ui.chat.components.TypingIndicatorBubble
@@ -140,6 +142,15 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             errorMessage = uiState.templatePreviewError,
             onDismiss = viewModel::onCloseTemplatePreview,
             onRefresh = viewModel::onRefreshTemplatePreviewClick,
+        )
+    }
+
+    if (uiState.isEditingAssistantMessage) {
+        EditAssistantMessageDialog(
+            text = uiState.editingAssistantMessageText,
+            onTextChange = viewModel::onAssistantMessageEditTextChange,
+            onDismiss = viewModel::onCancelAssistantMessageEdit,
+            onSave = viewModel::onSaveAssistantMessageEdit,
         )
     }
 
@@ -261,6 +272,7 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                 ) {
                     val lastUserMessageId = uiState.messages.lastOrNull { it.role == ChatRole.USER }?.id
+                    val lastAssistantMessageId = uiState.messages.lastOrNull { it.role == ChatRole.ASSISTANT }?.id
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
@@ -268,11 +280,24 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         items(uiState.messages, key = { it.id }) { message ->
-                            MessageBubble(
-                                message = message,
-                                isEditable = !uiState.isAssistantResponding && message.id == lastUserMessageId,
-                                onEditRequested = { viewModel.onEditLastMessageRequested(message.id) },
-                            )
+                            val isLastUserMessage = message.role == ChatRole.USER && message.id == lastUserMessageId
+                            val isLastAssistantMessage = message.role == ChatRole.ASSISTANT && message.id == lastAssistantMessageId
+                            Column {
+                                MessageBubble(
+                                    message = message,
+                                    isEditable = !uiState.isAssistantResponding && (isLastUserMessage || isLastAssistantMessage),
+                                    onEditRequested = {
+                                        if (isLastUserMessage) {
+                                            viewModel.onEditLastMessageRequested(message.id)
+                                        } else {
+                                            viewModel.onEditAssistantMessageRequested(message.id)
+                                        }
+                                    },
+                                )
+                                if (isLastAssistantMessage && uiState.canRetryLastResponse) {
+                                    RetryResponseRow(onClick = viewModel::onRetryLastResponse)
+                                }
+                            }
                         }
                         if (uiState.isAssistantResponding) {
                             item(key = "streaming") {

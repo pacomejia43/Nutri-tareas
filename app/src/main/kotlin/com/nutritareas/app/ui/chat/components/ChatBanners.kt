@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -134,6 +135,18 @@ fun EditingMessageRow(onCancel: () -> Unit, modifier: Modifier = Modifier) {
             IconButton(onClick = onCancel) {
                 Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.cd_cancel_edit_message))
             }
+        }
+    }
+}
+
+/** Shown right under Paco's last reply so she can ask for a fresh answer without retyping her
+ *  question - see [com.nutritareas.app.ui.chat.ChatViewModel.onRetryLastResponse]. */
+@Composable
+fun RetryResponseRow(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+        TextButton(onClick = onClick) {
+            Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.padding(end = 6.dp).size(16.dp))
+            Text(stringResource(R.string.retry_response), style = MaterialTheme.typography.labelLarge)
         }
     }
 }
